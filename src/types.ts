@@ -1,4 +1,4 @@
-export type View = 'dashboard' | 'appointments' | 'customers' | 'employees' | 'employee-profile' | 'services' | 'reports' | 'pos' | 'settings';
+export type View = 'dashboard' | 'appointments' | 'customers' | 'employees' | 'employee-profile' | 'services' | 'reports' | 'pos' | 'settings' | 'login';
 
 export interface Customer {
   id: number;

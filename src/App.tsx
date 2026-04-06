@@ -34,6 +34,7 @@ import { ServicesView } from './components/views/ServicesView';
 import { ReportsView } from './components/views/ReportsView';
 import { POSView } from './components/views/POSView';
 import { SettingsView } from './components/views/SettingsView';
+import { LoginView } from './components/views/LoginView';
 import { NewAppointmentModal } from './components/modals/NewAppointmentModal';
 import { NewCustomerModal } from './components/modals/NewCustomerModal';
 import { DeleteCustomerModal } from './components/modals/DeleteCustomerModal';
@@ -46,6 +47,7 @@ import { DeleteServiceModal } from './components/modals/DeleteServiceModal';
 import { Employee, Service } from './types';
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<View>('dashboard');
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
@@ -57,6 +59,10 @@ export default function App() {
   const [isAddShiftModalOpen, setIsAddShiftModalOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<any>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+
+  if (!isLoggedIn) {
+    return <LoginView onLogin={() => setIsLoggedIn(true)} />;
+  }
 
   return (
     <div className="flex min-h-screen bg-background font-sans">
@@ -126,7 +132,11 @@ export default function App() {
               <p className="text-xs font-bold text-primary">Admin Atelier</p>
               <p className="text-[10px] text-stone-400">Quản lý hệ thống</p>
             </div>
-            <LogOut size={16} className="text-stone-300 hover:text-red-500 cursor-pointer transition-colors" />
+            <LogOut 
+              size={16} 
+              className="text-stone-300 hover:text-red-500 cursor-pointer transition-colors" 
+              onClick={() => setIsLoggedIn(false)}
+            />
           </div>
           <button 
             onClick={() => setIsNewAppointmentModalOpen(true)}

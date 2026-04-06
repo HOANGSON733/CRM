@@ -35,6 +35,20 @@ export const servicesData: ServiceCategory[] = [
         image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&q=80&w=400",
         category: "Cắt & Tạo Kiểu",
         popularity: 82
+      },
+      {
+        id: 104,
+        name: "Cắt Tóc Trẻ Em",
+        duration: "30 phút",
+        price: "250.000",
+        cost: "80.000",
+        commissionRate: 20,
+        description: "Cắt tóc cho bé với không gian thân thiện.",
+        image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&q=80&w=400",
+        category: "Cắt & Tạo Kiểu",
+        popularity: 75,
+        tags: ["#kids", "#nhanh"],
+        gender: "unisex"
       }
     ]
   },
