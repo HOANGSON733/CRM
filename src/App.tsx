@@ -48,7 +48,6 @@ import { Employee, Service } from './types';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ role: 'admin' | 'manager' | 'stylist' | 'cashier'; name: string } | null>(null);
   const [activeTab, setActiveTab] = useState<View>('dashboard');
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
@@ -62,14 +61,7 @@ export default function App() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   if (!isLoggedIn) {
-    return (
-      <LoginView
-        onLogin={(user) => {
-          setCurrentUser(user);
-          setIsLoggedIn(true);
-        }}
-      />
-    );
+    return <LoginView onLogin={() => setIsLoggedIn(true)} />;
   }
 
   return (
@@ -137,24 +129,13 @@ export default function App() {
           <div className="bg-stone-50 p-4 rounded-2xl flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-serif">A</div>
             <div className="flex-1">
-              <p className="text-xs font-bold text-primary">{currentUser?.name || 'Người dùng'}</p>
-              <p className="text-[10px] text-stone-400 uppercase">
-                {currentUser?.role === 'admin'
-                  ? 'Quản trị hệ thống'
-                  : currentUser?.role === 'manager'
-                  ? 'Quản lý'
-                  : currentUser?.role === 'stylist'
-                  ? 'Stylist'
-                  : 'Thu ngân'}
-              </p>
+              <p className="text-xs font-bold text-primary">Admin Atelier</p>
+              <p className="text-[10px] text-stone-400">Quản lý hệ thống</p>
             </div>
             <LogOut 
               size={16} 
               className="text-stone-300 hover:text-red-500 cursor-pointer transition-colors" 
-              onClick={() => {
-                setIsLoggedIn(false);
-                setCurrentUser(null);
-              }}
+              onClick={() => setIsLoggedIn(false)}
             />
           </div>
           <button 

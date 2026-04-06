@@ -17,49 +17,12 @@ import {
 import { cn } from '../../lib/utils';
 
 interface LoginViewProps {
-  onLogin: (user: { role: 'admin' | 'manager' | 'stylist' | 'cashier'; name: string }) => void;
+  onLogin: () => void;
 }
 
 export function LoginView({ onLogin }: LoginViewProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [account, setAccount] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-
-  const demoAccounts = [
-    { key: 'admin', account: 'admin', password: 'admin123', role: 'admin' as const, name: 'System Admin' },
-    { key: 'manager', account: 'manager', password: 'manager123', role: 'manager' as const, name: 'Quản lý Salon' },
-    { key: 'stylist', account: 'stylist', password: 'stylist123', role: 'stylist' as const, name: 'Stylist Chính' },
-    { key: 'cashier', account: 'cashier', password: 'cashier123', role: 'cashier' as const, name: 'Thu ngân' }
-  ];
-
-  const handleCredentialLogin = () => {
-    const normalizedAccount = account.trim().toLowerCase();
-    const matchedAccount = demoAccounts.find(
-      (user) => user.account === normalizedAccount && user.password === password
-    );
-
-    if (!matchedAccount) {
-      setErrorMessage('Sai tài khoản hoặc mật khẩu. Dùng admin/admin123 để vào quyền Admin.');
-      return;
-    }
-
-    if (rememberMe) {
-      localStorage.setItem('crm-last-account', matchedAccount.account);
-    } else {
-      localStorage.removeItem('crm-last-account');
-    }
-
-    setErrorMessage('');
-    onLogin({ role: matchedAccount.role, name: matchedAccount.name });
-  };
-
-  const quickLogin = (role: 'admin' | 'manager' | 'stylist' | 'cashier') => {
-    const matchedAccount = demoAccounts.find((user) => user.role === role);
-    if (!matchedAccount) return;
-    onLogin({ role: matchedAccount.role, name: matchedAccount.name });
-  };
 
   const features = [
     {
@@ -93,10 +56,10 @@ export function LoginView({ onLogin }: LoginViewProps) {
           {/* Logo */}
           <div className="flex items-center gap-6">
             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-[#4a0e0e] text-3xl font-serif font-bold shadow-2xl">
-              S
+              B
             </div>
             <div className="space-y-1">
-              <h1 className="text-4xl font-serif text-white tracking-wide">CRM Hair Salon</h1>
+              <h1 className="text-4xl font-serif text-white tracking-wide">Bella Hair Salon</h1>
               <p className="text-amber-500 italic text-lg font-serif">Vẻ đẹp hoàn hảo — Trải nghiệm đẳng cấp</p>
             </div>
           </div>
@@ -125,7 +88,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
 
         <div className="relative z-10">
           <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">
-            © 2026 CRM HAIR SALON — ALL RIGHTS RESERVED
+            © 2026 BELLA HAIR SALON CRM — ALL RIGHTS RESERVED
           </p>
         </div>
       </div>
@@ -150,7 +113,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
           </div>
 
           {/* Form */}
-          <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); handleCredentialLogin(); }}>
+          <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); onLogin(); }}>
             <div className="space-y-6">
               {/* Account */}
               <div className="space-y-3">
@@ -160,8 +123,6 @@ export function LoginView({ onLogin }: LoginViewProps) {
                   <input 
                     type="text" 
                     placeholder="Nhập SĐT hoặc email..."
-                    value={account}
-                    onChange={(e) => setAccount(e.target.value)}
                     className="w-full bg-stone-100/50 border-none rounded-2xl py-5 pl-16 pr-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none"
                   />
                 </div>
@@ -175,8 +136,6 @@ export function LoginView({ onLogin }: LoginViewProps) {
                   <input 
                     type={showPassword ? "text" : "password"}
                     placeholder="Nhập mật khẩu..."
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-stone-100/50 border-none rounded-2xl py-5 pl-16 pr-16 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none"
                   />
                   <button 
@@ -208,9 +167,6 @@ export function LoginView({ onLogin }: LoginViewProps) {
                 Quên mật khẩu?
               </button>
             </div>
-            {errorMessage ? (
-              <p className="text-xs font-bold text-red-600">{errorMessage}</p>
-            ) : null}
 
             {/* Login Button */}
             <button 
@@ -231,29 +187,19 @@ export function LoginView({ onLogin }: LoginViewProps) {
 
             <div className="flex flex-wrap justify-center gap-4">
               <button 
-                type="button"
-                onClick={() => quickLogin('admin')}
-                className="flex items-center gap-3 px-6 py-3 border border-amber-300 bg-amber-50 rounded-full text-xs font-bold text-amber-700 hover:bg-amber-100 transition-all"
-              >
-                <Crown size={16} className="text-amber-600" /> Admin
-              </button>
-              <button 
-                type="button"
-                onClick={() => quickLogin('manager')}
+                onClick={onLogin}
                 className="flex items-center gap-3 px-6 py-3 border border-stone-200 rounded-full text-xs font-bold text-stone-600 hover:bg-stone-50 transition-all"
               >
                 <Crown size={16} className="text-amber-500" /> Quản lý
               </button>
               <button 
-                type="button"
-                onClick={() => quickLogin('stylist')}
+                onClick={onLogin}
                 className="flex items-center gap-3 px-6 py-3 border border-stone-200 rounded-full text-xs font-bold text-stone-600 hover:bg-stone-50 transition-all"
               >
                 <Scissors size={16} className="text-stone-400" /> Stylist
               </button>
               <button 
-                type="button"
-                onClick={() => quickLogin('cashier')}
+                onClick={onLogin}
                 className="flex items-center gap-3 px-6 py-3 border border-stone-200 rounded-full text-xs font-bold text-stone-600 hover:bg-stone-50 transition-all"
               >
                 <Tag size={16} className="text-amber-600" /> Thu ngân
