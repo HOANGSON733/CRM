@@ -34,6 +34,7 @@ import { ServicesView } from './components/views/ServicesView';
 import { ReportsView } from './components/views/ReportsView';
 import { POSView } from './components/views/POSView';
 import { SettingsView } from './components/views/SettingsView';
+import { MarketingView } from './components/views/MarketingView';
 import { LoginView } from './components/views/LoginView';
 import { NewAppointmentModal } from './components/modals/NewAppointmentModal';
 import { NewCustomerModal } from './components/modals/NewCustomerModal';
@@ -44,6 +45,7 @@ import { TerminateEmployeeModal } from './components/modals/TerminateEmployeeMod
 import { NewServiceModal } from './components/modals/NewServiceModal';
 import { EditServiceModal } from './components/modals/EditServiceModal';
 import { DeleteServiceModal } from './components/modals/DeleteServiceModal';
+import { NewPromoCodeModal } from './components/modals/NewPromoCodeModal';
 import { Employee, Service } from './types';
 
 export default function App() {
@@ -53,6 +55,7 @@ export default function App() {
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const [isNewEmployeeModalOpen, setIsNewEmployeeModalOpen] = useState(false);
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
+  const [isNewPromoCodeModalOpen, setIsNewPromoCodeModalOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
@@ -110,7 +113,12 @@ export default function App() {
             active={activeTab === 'reports'}
             onClick={() => setActiveTab('reports')}
           />
-          <SidebarItem icon={<Megaphone size={20} />} label="Tích điểm & Marketing" />
+          <SidebarItem 
+            icon={<Megaphone size={20} />} 
+            label="Tích điểm & Marketing" 
+            active={activeTab === 'marketing'}
+            onClick={() => setActiveTab('marketing')}
+          />
           <SidebarItem 
             icon={<CreditCard size={20} />} 
             label="POS & Thanh toán" 
@@ -215,6 +223,11 @@ export default function App() {
             <POSView key="pos" />
           ) : activeTab === 'settings' ? (
             <SettingsView key="settings" />
+          ) : activeTab === 'marketing' ? (
+            <MarketingView 
+              key="marketing" 
+              onNewPromoCode={() => setIsNewPromoCodeModalOpen(true)} 
+            />
           ) : null}
         </AnimatePresence>
       </main>
@@ -308,6 +321,13 @@ export default function App() {
               setServiceToDelete(null);
             }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* New Promo Code Modal */}
+      <AnimatePresence>
+        {isNewPromoCodeModalOpen && (
+          <NewPromoCodeModal onClose={() => setIsNewPromoCodeModalOpen(false)} />
         )}
       </AnimatePresence>
     </div>

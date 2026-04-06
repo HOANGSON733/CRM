@@ -1,4 +1,4 @@
-export type View = 'dashboard' | 'appointments' | 'customers' | 'employees' | 'employee-profile' | 'services' | 'reports' | 'pos' | 'settings' | 'login';
+export type View = 'dashboard' | 'appointments' | 'customers' | 'employees' | 'employee-profile' | 'services' | 'reports' | 'pos' | 'settings' | 'login' | 'marketing';
 
 export interface Customer {
   id: number;
@@ -65,8 +65,12 @@ export interface Service {
   name: string;
   duration: string;
   price: string;
+  cost?: string;
+  commissionRate?: number;
   description: string;
   image: string;
   category: string;
   popularity?: number;
+  tags?: string[];
+  gender?: string;
 }
