@@ -376,21 +376,39 @@ export function SettingsView() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
 
-          {/* Bottom Grid: Staff & Products */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Default Staff */}
-            <div className="space-y-8">
-              <div className="flex items-center gap-3 text-primary">
-                <Users size={24} />
-                <h3 className="text-xl font-serif">Thợ mặc định theo ca</h3>
-              </div>
-              <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-stone-100 space-y-8">
-                <div className="relative">
-                  <select className="w-full bg-stone-50 border border-stone-100 rounded-2xl py-4 px-6 text-sm font-bold text-primary appearance-none outline-none">
-                    <option>Dịch vụ: Cắt tóc Nam (60 phút)</option>
-                  </select>
-                  <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+      {/* Staff Levels Tab */}
+      {activeTab === 'Cấp bậc nhân viên' && renderStaffLevels()}
+
+      {/* Default Staff Tab */}
+      {activeTab === 'Thợ mặc định' && (
+        <div className="space-y-8">
+          <div className="flex justify-between items-end">
+            <div className="space-y-1">
+              <h3 className="text-2xl font-serif text-primary">Thợ mặc định theo ca</h3>
+              <p className="text-stone-400 text-sm">Thiết lập nhân sự phụ trách mặc định cho từng loại dịch vụ và khung giờ</p>
+            </div>
+            <button className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xl hover:bg-primary-light transition-all">
+              <Plus size={16} /> Thêm cấu hình ca
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {[1, 2].map((i) => (
+              <div key={i} className="bg-white p-10 rounded-[3rem] shadow-sm border border-stone-100 space-y-8">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-stone-100 rounded-2xl flex items-center justify-center text-primary">
+                      <Scissors size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-primary">{i === 1 ? 'Cắt tóc Nam' : 'Nhuộm màu kỹ thuật'}</h4>
+                      <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">DỊCH VỤ PHỔ BIẾN</p>
+                    </div>
+                  </div>
+                  <button className="text-stone-300 hover:text-primary transition-colors"><Edit2 size={18} /></button>
                 </div>
 
                 <div className="space-y-4">
@@ -427,27 +445,82 @@ export function SettingsView() {
                   </div>
                 </div>
               </div>
-            </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-            {/* Retail Products */}
-            <div className="space-y-8">
-              <div className="flex items-center gap-3 text-primary">
-                <ShoppingBag size={24} />
-                <h3 className="text-xl font-serif">Sản phẩm bán lẻ nổi bật</h3>
+      {/* Retail Products Tab */}
+      {activeTab === 'Sản phẩm bán lẻ' && (
+        <div className="space-y-8">
+          <div className="flex justify-between items-end">
+            <div className="space-y-1">
+              <h3 className="text-2xl font-serif text-primary">Sản phẩm bán lẻ</h3>
+              <p className="text-stone-400 text-sm">Quản lý danh mục sản phẩm chăm sóc tóc bán tại Salon</p>
+            </div>
+            <button className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xl hover:bg-primary-light transition-all">
+              <Plus size={16} /> Thêm sản phẩm
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {products.map((product) => (
+              <div key={product.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-stone-100 space-y-6 group">
+                <div className="aspect-square rounded-3xl overflow-hidden relative">
+                  <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold text-primary shadow-sm">
+                    {product.stock} CÒN LẠI
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">{product.brand}</p>
+                    <h4 className="text-lg font-serif text-primary leading-tight">{product.name}</h4>
+                  </div>
+                  <div className="flex justify-between items-end">
+                    <p className="text-xl font-serif text-primary">{product.price}</p>
+                    <div className="flex gap-2">
+                      <button className="p-2 text-stone-300 hover:text-primary transition-colors"><Edit2 size={16} /></button>
+                      <button className="p-2 text-stone-300 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-stone-100 space-y-6">
-                {products.map((product) => (
-                  <div key={product.id} className="flex items-center gap-6 group">
-                    <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-sm">
-                      <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Customer Sources & Cancellation Reasons Tab */}
+      {(activeTab === 'Nguồn khách' || activeTab === 'Lý do hủy') && (
+        <div className="space-y-8">
+          <div className="flex justify-between items-end">
+            <div className="space-y-1">
+              <h3 className="text-2xl font-serif text-primary">{activeTab}</h3>
+              <p className="text-stone-400 text-sm">Quản lý các tham số phân tích dữ liệu khách hàng</p>
+            </div>
+            <button className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xl hover:bg-primary-light transition-all">
+              <Plus size={16} /> Thêm mới
+            </button>
+          </div>
+
+          <div className="bg-white rounded-[3rem] shadow-sm border border-stone-100 overflow-hidden">
+            <div className="p-10 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(activeTab === 'Nguồn khách' ? ['Facebook', 'Instagram', 'TikTok', 'Zalo', 'Walk-in', 'Referral'] : ['Khách quên lịch', 'Trùng lịch thợ', 'Khách bận đột xuất', 'Thời tiết xấu', 'Lỗi hệ thống']).map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-6 bg-stone-50/50 rounded-2xl border border-stone-50 group hover:border-primary/20 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm",
+                        activeTab === 'Nguồn khách' ? "bg-primary" : "bg-red-900"
+                      )}>
+                        {activeTab === 'Nguồn khách' ? <Share2 size={18} /> : <XCircle size={18} />}
+                      </div>
+                      <span className="text-sm font-bold text-primary">{item}</span>
                     </div>
-                    <div className="flex-1 space-y-1">
-                      <h4 className="text-sm font-bold text-primary">{product.name}</h4>
-                      <p className="text-[10px] text-stone-400 italic">{product.brand}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-primary">{product.price}</p>
-                      <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỒN: <span className={cn(product.stock < 10 ? "text-red-500" : "text-stone-600")}>{product.stock.toString().padStart(2, '0')}</span></p>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button className="text-stone-300 hover:text-primary transition-colors"><Edit2 size={14} /></button>
+                      <button className="text-stone-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 ))}
@@ -457,24 +530,65 @@ export function SettingsView() {
         </div>
       )}
 
-      {/* Staff Levels Tab */}
-      {activeTab === 'Cấp bậc nhân viên' && renderStaffLevels()}
-
-      {/* Other Tabs Fallback */}
-      {activeTab !== 'Danh mục dịch vụ' && activeTab !== 'Cấp bậc nhân viên' && (
-        <div className="bg-white p-20 rounded-[3rem] shadow-sm border border-stone-100 text-center space-y-4">
-          <div className="w-20 h-20 bg-stone-50 rounded-full flex items-center justify-center text-stone-300 mx-auto">
-            <Shield size={40} />
+      {/* Time Units Tab */}
+      {activeTab === 'Thời lượng' && (
+        <div className="space-y-8">
+          <div className="space-y-1">
+            <h3 className="text-2xl font-serif text-primary">Cấu hình thời gian</h3>
+            <p className="text-stone-400 text-sm">Thiết lập các đơn vị thời gian vận hành hệ thống</p>
           </div>
-          <div className="space-y-2">
-            <h4 className="text-xl font-serif text-primary">Đang phát triển</h4>
-            <p className="text-stone-400 text-sm">Tính năng {activeTab} đang được hoàn thiện.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-stone-100 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center">
+                  <Clock size={24} />
+                </div>
+                <h4 className="text-xl font-serif text-primary">Đơn vị thời gian tối thiểu</h4>
+              </div>
+              <div className="space-y-6">
+                <div className="flex justify-between items-center p-6 bg-stone-50 rounded-2xl">
+                  <span className="text-sm font-bold text-primary">Thời lượng bước nhảy</span>
+                  <div className="flex items-center gap-4">
+                    <button className="w-8 h-8 rounded-full bg-white border border-stone-200 flex items-center justify-center text-primary">-</button>
+                    <span className="text-lg font-serif text-primary">15 phút</span>
+                    <button className="w-8 h-8 rounded-full bg-white border border-stone-200 flex items-center justify-center text-primary">+</button>
+                  </div>
+                </div>
+                <p className="text-xs text-stone-400 leading-relaxed italic">
+                  * Đơn vị này sẽ ảnh hưởng đến việc hiển thị lưới thời gian trên trang Đặt lịch và tính toán thời gian phục vụ.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-stone-100 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center">
+                  <Shield size={24} />
+                </div>
+                <h4 className="text-xl font-serif text-primary">Thời gian đệm (Buffer)</h4>
+              </div>
+              <div className="space-y-6">
+                <div className="flex justify-between items-center p-6 bg-stone-50 rounded-2xl">
+                  <span className="text-sm font-bold text-primary">Thời gian nghỉ giữa ca</span>
+                  <div className="flex items-center gap-4">
+                    <button className="w-8 h-8 rounded-full bg-white border border-stone-200 flex items-center justify-center text-primary">-</button>
+                    <span className="text-lg font-serif text-primary">5 phút</span>
+                    <button className="w-8 h-8 rounded-full bg-white border border-stone-200 flex items-center justify-center text-primary">+</button>
+                  </div>
+                </div>
+                <p className="text-xs text-stone-400 leading-relaxed italic">
+                  * Khoảng thời gian trống tự động được thêm vào sau mỗi dịch vụ để thợ dọn dẹp và chuẩn bị.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Footer Config Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-12 pt-12 border-t border-stone-100">
+      {/* Footer Config Grid - Only show if not in specific tabs to avoid redundancy */}
+      {activeTab === 'Danh mục dịch vụ' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 pt-12 border-t border-stone-100">
         <div className="space-y-6">
           <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-2">
             <Share2 size={12} /> NGUỒN KHÁCH HÀNG
@@ -520,6 +634,7 @@ export function SettingsView() {
           </div>
         </div>
       </div>
+      )}
 
       <div className="text-center pt-8">
         <p className="text-[9px] font-bold text-stone-300 uppercase tracking-[0.2em]">
