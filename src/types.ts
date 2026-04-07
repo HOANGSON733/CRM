@@ -1,7 +1,7 @@
 export type View = 'dashboard' | 'appointments' | 'customers' | 'employees' | 'employee-profile' | 'services' | 'reports' | 'pos' | 'settings' | 'login' | 'marketing';
 
 export interface Customer {
-  id: number;
+  id: string | number;
   name: string;
   tags: string[];
   phone: string;

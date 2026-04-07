@@ -22,6 +22,14 @@ interface DashboardViewProps {
   onNewCustomer: () => void;
   key?: string;
 }
+const today = new Date().toLocaleDateString('vi-VN', {
+  weekday: 'long',
+  day: '2-digit',
+  month: 'long',
+  year: 'numeric',
+});
+
+const formattedDate = today.charAt(0).toUpperCase() + today.slice(1);
 
 export function DashboardView({ onNewCustomer }: DashboardViewProps) {
   return (
@@ -34,7 +42,9 @@ export function DashboardView({ onNewCustomer }: DashboardViewProps) {
       <div className="flex justify-between items-end mb-10">
         <div>
           <h2 className="text-4xl font-serif text-primary mb-2">Chào buổi sáng, Admin</h2>
-          <p className="text-stone-500">Hôm nay là Thứ Ba, ngày 24 tháng 10 năm 2023</p>
+            <p className="text-stone-500">
+              Hôm nay là {formattedDate}
+            </p>
         </div>
         <div className="flex gap-4">
           <button 

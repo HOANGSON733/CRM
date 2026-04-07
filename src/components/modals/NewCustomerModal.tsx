@@ -5,10 +5,54 @@ import { cn } from '../../lib/utils';
 
 interface NewCustomerModalProps {
   onClose: () => void;
+  onSave: (payload: {
+    name: string;
+    phone: string;
+    email: string;
+    birthday: string;
+    gender: string;
+    source: string;
+    notes: string;
+  }) => Promise<void>;
 }
 
-export function NewCustomerModal({ onClose }: NewCustomerModalProps) {
+export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
   const [selectedSource, setSelectedSource] = useState('Facebook');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [birthday, setBirthday] = useState('');
+  const [gender, setGender] = useState('Nữ');
+  const [notes, setNotes] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    if (!name.trim() || !phone.trim()) {
+      setErrorMessage('Vui lòng nhập họ tên và số điện thoại.');
+      return;
+    }
+    setErrorMessage('');
+    setIsSaving(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        birthday,
+        gender,
+        source: selectedSource,
+        notes: notes.trim(),
+      });
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể lưu khách hàng.';
+      setErrorMessage(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -71,6 +115,8 @@ export function NewCustomerModal({ onClose }: NewCustomerModalProps) {
                 <input 
                   type="text" 
                   placeholder="Ví dụ: Nguyễn Thảo My"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                 />
               </div>
@@ -79,6 +125,8 @@ export function NewCustomerModal({ onClose }: NewCustomerModalProps) {
                 <input 
                   type="tel" 
                   placeholder="09xx xxx xxx"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                 />
               </div>
@@ -87,6 +135,8 @@ export function NewCustomerModal({ onClose }: NewCustomerModalProps) {
                 <input 
                   type="email" 
                   placeholder="khachhang@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                 />
               </div>
@@ -95,12 +145,18 @@ export function NewCustomerModal({ onClose }: NewCustomerModalProps) {
                   <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">NGÀY SINH</label>
                   <input 
                     type="date" 
+                    value={birthday}
+                    onChange={(e) => setBirthday(e.target.value)}
                     className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">GIỚI TÍNH</label>
-                  <select className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all appearance-none">
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all appearance-none"
+                  >
                     <option>Nữ</option>
                     <option>Nam</option>
                     <option>Khác</option>
@@ -134,6 +190,8 @@ export function NewCustomerModal({ onClose }: NewCustomerModalProps) {
                   <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">GHI CHÚ ĐẶC BIỆT</label>
                   <textarea 
                     placeholder="Dị ứng hóa chất, thói quen làm tóc..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
                     className="w-full bg-stone-50 border border-stone-100 rounded-2xl p-5 text-sm h-32 focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all resize-none"
                   />
                 </div>
@@ -159,10 +217,19 @@ export function NewCustomerModal({ onClose }: NewCustomerModalProps) {
             >
               Hủy bỏ
             </button>
-            <button className="px-12 py-4 bg-primary text-white rounded-2xl text-sm font-bold shadow-xl hover:bg-primary-light transition-all active:scale-95">
-              Lưu hồ sơ khách hàng
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="px-12 py-4 bg-primary text-white rounded-2xl text-sm font-bold shadow-xl hover:bg-primary-light transition-all active:scale-95 disabled:opacity-60"
+            >
+              {isSaving ? 'ĐANG LƯU...' : 'Lưu hồ sơ khách hàng'}
             </button>
           </div>
+          {errorMessage && (
+            <div className="px-10 pb-8">
+              <p className="text-xs font-bold text-red-500">{errorMessage}</p>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>

@@ -24,17 +24,31 @@ import {
   CartesianGrid 
 } from 'recharts';
 import { KPICard } from '../KPICard';
-import { customersData } from '../../data/mockData';
 import { cn } from '../../lib/utils';
+import { Customer } from '../../types';
 
 interface CustomersViewProps {
+  customers: Customer[];
   onNewCustomer: () => void;
   onDeleteCustomer: (customer: any) => void;
   key?: string;
 }
 
-export function CustomersView({ onNewCustomer, onDeleteCustomer }: CustomersViewProps) {
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(customersData[0]);
+export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: CustomersViewProps) {
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(customers[0] || null);
+
+  React.useEffect(() => {
+    if (!customers.length) {
+      setSelectedCustomer(null);
+      return;
+    }
+
+    setSelectedCustomer((prev: any) => {
+      if (!prev) return customers[0];
+      const matched = customers.find((item) => item.id === prev.id);
+      return matched || customers[0];
+    });
+  }, [customers]);
 
   return (
     <motion.div 
@@ -58,7 +72,7 @@ export function CustomersView({ onNewCustomer, onDeleteCustomer }: CustomersView
       </div>
 
       <div className="grid grid-cols-4 gap-6 mb-10">
-        <KPICard title="Tổng khách hàng" value="1.284" trend="+5.2%" color="primary" />
+        <KPICard title="Tổng khách hàng" value={String(customers.length)} trend="+5.2%" color="primary" />
         <KPICard title="Khách hàng mới" value="156" subtitle="Tháng này" color="secondary" />
         <KPICard title="Tỷ lệ quay lại" value="78%" trend="+2.1%" color="stone" />
         <KPICard title="Giá trị TB/Khách" value="1.450.000₫" color="secondary-light" />
@@ -97,7 +111,7 @@ export function CustomersView({ onNewCustomer, onDeleteCustomer }: CustomersView
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-50">
-                {customersData.map((customer) => (
+                {customers.map((customer) => (
                   <tr 
                     key={customer.id} 
                     onClick={() => setSelectedCustomer(customer)}

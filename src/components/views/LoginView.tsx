@@ -8,21 +8,61 @@ import {
   Lock, 
   Eye, 
   EyeOff, 
-  Crown, 
-  Scissors, 
-  Tag, 
-  Phone,
   HelpCircle
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface LoginViewProps {
-  onLogin: () => void;
+  onLogin: (token: string) => void;
 }
 
 export function LoginView({ onLogin }: LoginViewProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [account, setAccount] = useState('');
+  const [password, setPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    const normalizedAccount = account.trim().toLowerCase();
+    if (!normalizedAccount || !password) {
+      setErrorMessage('Vui lòng nhập đầy đủ tài khoản và mật khẩu.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account: normalizedAccount, password })
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setErrorMessage(data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+        return;
+      }
+
+      const data = await response.json();
+      if (!data?.token) {
+        setErrorMessage('Thiếu token đăng nhập từ máy chủ.');
+        return;
+      }
+
+      setErrorMessage('');
+      onLogin(data.token);
+    } catch (_error) {
+      setErrorMessage('Không kết nối được máy chủ. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const features = [
     {
@@ -56,10 +96,10 @@ export function LoginView({ onLogin }: LoginViewProps) {
           {/* Logo */}
           <div className="flex items-center gap-6">
             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-[#4a0e0e] text-3xl font-serif font-bold shadow-2xl">
-              B
+              C
             </div>
             <div className="space-y-1">
-              <h1 className="text-4xl font-serif text-white tracking-wide">Bella Hair Salon</h1>
+              <h1 className="text-4xl font-serif text-white tracking-wide">Hair Salon Chính</h1>
               <p className="text-amber-500 italic text-lg font-serif">Vẻ đẹp hoàn hảo — Trải nghiệm đẳng cấp</p>
             </div>
           </div>
@@ -88,7 +128,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
 
         <div className="relative z-10">
           <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">
-            © 2026 BELLA HAIR SALON CRM — ALL RIGHTS RESERVED
+            © 2026 HAIR SALON CHÍNH CRM — ALL RIGHTS RESERVED
           </p>
         </div>
       </div>
@@ -113,7 +153,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
           </div>
 
           {/* Form */}
-          <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); onLogin(); }}>
+          <form className="space-y-8" onSubmit={handleLogin}>
             <div className="space-y-6">
               {/* Account */}
               <div className="space-y-3">
@@ -123,6 +163,11 @@ export function LoginView({ onLogin }: LoginViewProps) {
                   <input 
                     type="text" 
                     placeholder="Nhập SĐT hoặc email..."
+                    value={account}
+                    onChange={(e) => {
+                      setAccount(e.target.value);
+                      if (errorMessage) setErrorMessage('');
+                    }}
                     className="w-full bg-stone-100/50 border-none rounded-2xl py-5 pl-16 pr-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none"
                   />
                 </div>
@@ -136,6 +181,11 @@ export function LoginView({ onLogin }: LoginViewProps) {
                   <input 
                     type={showPassword ? "text" : "password"}
                     placeholder="Nhập mật khẩu..."
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errorMessage) setErrorMessage('');
+                    }}
                     className="w-full bg-stone-100/50 border-none rounded-2xl py-5 pl-16 pr-16 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none"
                   />
                   <button 
@@ -171,41 +221,16 @@ export function LoginView({ onLogin }: LoginViewProps) {
             {/* Login Button */}
             <button 
               type="submit"
+              disabled={isSubmitting}
               className="w-full bg-[#4a0e0e] text-white py-6 rounded-2xl text-sm font-bold shadow-2xl hover:bg-[#5a1e1e] transition-all uppercase tracking-widest active:scale-[0.98]"
             >
-              ĐĂNG NHẬP
+              {isSubmitting ? 'ĐANG XÁC THỰC...' : 'ĐĂNG NHẬP'}
             </button>
+            {errorMessage && (
+              <p className="text-xs font-bold text-red-500 text-center">{errorMessage}</p>
+            )}
           </form>
 
-          {/* Quick Login */}
-          <div className="space-y-8">
-            <div className="flex items-center gap-4">
-              <div className="h-px bg-stone-100 flex-1" />
-              <span className="text-[10px] font-bold text-stone-300 uppercase tracking-widest">Hoặc đăng nhập nhanh</span>
-              <div className="h-px bg-stone-100 flex-1" />
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-4">
-              <button 
-                onClick={onLogin}
-                className="flex items-center gap-3 px-6 py-3 border border-stone-200 rounded-full text-xs font-bold text-stone-600 hover:bg-stone-50 transition-all"
-              >
-                <Crown size={16} className="text-amber-500" /> Quản lý
-              </button>
-              <button 
-                onClick={onLogin}
-                className="flex items-center gap-3 px-6 py-3 border border-stone-200 rounded-full text-xs font-bold text-stone-600 hover:bg-stone-50 transition-all"
-              >
-                <Scissors size={16} className="text-stone-400" /> Stylist
-              </button>
-              <button 
-                onClick={onLogin}
-                className="flex items-center gap-3 px-6 py-3 border border-stone-200 rounded-full text-xs font-bold text-stone-600 hover:bg-stone-50 transition-all"
-              >
-                <Tag size={16} className="text-amber-600" /> Thu ngân
-              </button>
-            </div>
-          </div>
         </motion.div>
 
         {/* Footer */}

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
-import { View } from './types';
+import { Customer, View } from './types';
 
 // Components
 import { SidebarItem } from './components/SidebarItem';
@@ -49,7 +49,9 @@ import { NewPromoCodeModal } from './components/modals/NewPromoCodeModal';
 import { Employee, Service } from './types';
 
 export default function App() {
+  const [authChecking, setAuthChecking] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
   const [activeTab, setActiveTab] = useState<View>('dashboard');
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
@@ -62,9 +64,101 @@ export default function App() {
   const [isAddShiftModalOpen, setIsAddShiftModalOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<any>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  const loadCustomers = async (token: string) => {
+    const response = await fetch('/api/customers', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tải danh sách khách hàng.');
+    }
+    const data = await response.json();
+    setCustomers(Array.isArray(data?.customers) ? data.customers : []);
+  };
+
+  useEffect(() => {
+    const verifyAuth = async () => {
+      if (!authToken) {
+        setIsLoggedIn(false);
+        setAuthChecking(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (!response.ok) throw new Error('Invalid token');
+        setIsLoggedIn(true);
+        await loadCustomers(authToken);
+      } catch (_error) {
+        localStorage.removeItem('auth_token');
+        setAuthToken(null);
+        setIsLoggedIn(false);
+        setCustomers([]);
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+
+    verifyAuth();
+  }, [authToken]);
+
+  const handleLogin = (token: string) => {
+    localStorage.setItem('auth_token', token);
+    setAuthToken(token);
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    setAuthToken(null);
+    setIsLoggedIn(false);
+    setCustomers([]);
+  };
+
+  const handleCreateCustomer = async (payload: {
+    name: string;
+    phone: string;
+    email: string;
+    birthday: string;
+    gender: string;
+    source: string;
+    notes: string;
+  }) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch('/api/customers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tạo khách hàng mới.');
+    }
+
+    await loadCustomers(authToken);
+  };
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-stone-50 text-stone-500 text-sm font-bold tracking-wider">
+        ĐANG KIỂM TRA PHIÊN ĐĂNG NHẬP...
+      </div>
+    );
+  }
 
   if (!isLoggedIn) {
-    return <LoginView onLogin={() => setIsLoggedIn(true)} />;
+    return <LoginView onLogin={handleLogin} />;
   }
 
   return (
@@ -143,7 +237,7 @@ export default function App() {
             <LogOut 
               size={16} 
               className="text-stone-300 hover:text-red-500 cursor-pointer transition-colors" 
-              onClick={() => setIsLoggedIn(false)}
+              onClick={handleLogout}
             />
           </div>
           <button 
@@ -190,6 +284,7 @@ export default function App() {
           ) : activeTab === 'customers' ? (
             <CustomersView 
               key="customers" 
+              customers={customers}
               onNewCustomer={() => setIsNewCustomerModalOpen(true)} 
               onDeleteCustomer={(customer) => setCustomerToDelete(customer)}
             />
@@ -242,7 +337,10 @@ export default function App() {
       {/* New Customer Modal */}
       <AnimatePresence>
         {isNewCustomerModalOpen && (
-          <NewCustomerModal onClose={() => setIsNewCustomerModalOpen(false)} />
+          <NewCustomerModal
+            onClose={() => setIsNewCustomerModalOpen(false)}
+            onSave={handleCreateCustomer}
+          />
         )}
       </AnimatePresence>
 
