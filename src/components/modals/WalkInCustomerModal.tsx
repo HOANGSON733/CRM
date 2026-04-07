@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils';
 
 interface WalkInCustomerModalProps {
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: { name: string; phone: string; birthday: string; addPoints: boolean; pointsToEarn: number }) => Promise<void>;
   pointsToEarn?: number;
 }
 
@@ -14,10 +14,27 @@ export function WalkInCustomerModal({ onClose, onSave, pointsToEarn = 230 }: Wal
   const [phone, setPhone] = useState('');
   const [birthday, setBirthday] = useState('');
   const [addPoints, setAddPoints] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    onSave({ name, phone, birthday, addPoints });
-    onClose();
+  const handleSave = async () => {
+    if (isSaving) return;
+    if (!name.trim() || !phone.trim()) {
+      setErrorMessage('Vui lòng nhập họ tên và số điện thoại.');
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage('');
+    try {
+      await onSave({ name: name.trim(), phone: phone.trim(), birthday, addPoints, pointsToEarn });
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể lưu khách vãng lai.';
+      setErrorMessage(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -130,11 +147,13 @@ export function WalkInCustomerModal({ onClose, onSave, pointsToEarn = 230 }: Wal
             </button>
             <button 
               onClick={handleSave}
-              className="w-full py-5 bg-primary text-white rounded-2xl text-sm font-bold shadow-2xl hover:bg-primary-light transition-all uppercase tracking-widest active:scale-95"
+              disabled={isSaving}
+              className="w-full py-5 bg-primary text-white rounded-2xl text-sm font-bold shadow-2xl hover:bg-primary-light transition-all uppercase tracking-widest active:scale-95 disabled:opacity-60"
             >
-              LƯU KHÁCH HÀNG
+              {isSaving ? 'ĐANG LƯU...' : 'LƯU KHÁCH HÀNG'}
             </button>
           </div>
+          {errorMessage && <p className="text-xs font-bold text-red-500 text-center">{errorMessage}</p>}
         </div>
       </motion.div>
     </div>

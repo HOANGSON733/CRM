@@ -392,7 +392,7 @@ export function POSView() {
         {isWalkInModalOpen && (
           <WalkInCustomerModal 
             onClose={() => setIsWalkInModalOpen(false)}
-            onSave={(data) => {
+            onSave={async (data) => {
               console.log('Saving walk-in customer:', data);
               setIsWalkInModalOpen(false);
             }}

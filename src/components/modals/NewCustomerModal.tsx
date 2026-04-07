@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Upload } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -13,6 +13,7 @@ interface NewCustomerModalProps {
     gender: string;
     source: string;
     notes: string;
+    avatar?: string;
   }) => Promise<void>;
 }
 
@@ -24,8 +25,39 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
   const [birthday, setBirthday] = useState('');
   const [gender, setGender] = useState('Nữ');
   const [notes, setNotes] = useState('');
+  const [avatar, setAvatar] = useState<string | undefined>(undefined);
+  const [avatarName, setAvatarName] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleChooseAvatar = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Vui lòng chọn file ảnh hợp lệ.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('Ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatar(String(reader.result || ''));
+      setAvatarName(file.name);
+      setErrorMessage('');
+    };
+    reader.onerror = () => {
+      setErrorMessage('Không thể đọc file ảnh. Vui lòng thử lại.');
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSave = async () => {
     if (isSaving) return;
@@ -44,6 +76,7 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
         gender,
         source: selectedSource,
         notes: notes.trim(),
+        avatar,
       });
       onClose();
     } catch (error) {
@@ -199,12 +232,32 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
 
               <div className="space-y-4">
                 <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">ẢNH ĐẠI DIỆN / MẪU TÓC</label>
-                <div className="border-2 border-dashed border-stone-200 rounded-[2rem] h-full min-h-[200px] flex flex-col items-center justify-center p-8 text-center group hover:border-primary/40 transition-all cursor-pointer bg-stone-50/50">
-                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-stone-300 shadow-sm group-hover:scale-110 group-hover:text-primary transition-all mb-4">
-                    <Upload size={28} />
-                  </div>
-                  <p className="text-sm font-bold text-stone-600 mb-1">Kéo thả ảnh vào đây</p>
-                  <p className="text-[10px] text-stone-400 font-medium">Hoặc nhấn để chọn từ máy tính (Max 5MB)</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <div
+                  onClick={handleChooseAvatar}
+                  className="border-2 border-dashed border-stone-200 rounded-[2rem] h-full min-h-[200px] flex flex-col items-center justify-center p-8 text-center group hover:border-primary/40 transition-all cursor-pointer bg-stone-50/50"
+                >
+                  {avatar ? (
+                    <>
+                      <img src={avatar} alt="Preview avatar" className="w-28 h-28 object-cover rounded-2xl shadow-md mb-3" />
+                      <p className="text-xs font-bold text-primary mb-1">{avatarName || 'Ảnh đã chọn'}</p>
+                      <p className="text-[10px] text-stone-400 font-medium">Nhấn để thay đổi ảnh</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-stone-300 shadow-sm group-hover:scale-110 group-hover:text-primary transition-all mb-4">
+                        <Upload size={28} />
+                      </div>
+                      <p className="text-sm font-bold text-stone-600 mb-1">Kéo thả ảnh vào đây</p>
+                      <p className="text-[10px] text-stone-400 font-medium">Hoặc nhấn để chọn từ máy tính (Max 5MB)</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

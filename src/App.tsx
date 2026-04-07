@@ -38,6 +38,7 @@ import { MarketingView } from './components/views/MarketingView';
 import { LoginView } from './components/views/LoginView';
 import { NewAppointmentModal } from './components/modals/NewAppointmentModal';
 import { NewCustomerModal } from './components/modals/NewCustomerModal';
+import { WalkInCustomerModal } from './components/modals/WalkInCustomerModal';
 import { DeleteCustomerModal } from './components/modals/DeleteCustomerModal';
 import { AddShiftModal } from './components/modals/AddShiftModal';
 import { NewEmployeeModal } from './components/modals/NewEmployeeModal';
@@ -55,6 +56,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<View>('dashboard');
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+  const [isWalkInCustomerModalOpen, setIsWalkInCustomerModalOpen] = useState(false);
   const [isNewEmployeeModalOpen, setIsNewEmployeeModalOpen] = useState(false);
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
   const [isNewPromoCodeModalOpen, setIsNewPromoCodeModalOpen] = useState(false);
@@ -127,6 +129,7 @@ export default function App() {
     gender: string;
     source: string;
     notes: string;
+    avatar?: string;
   }) => {
     if (!authToken) {
       throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
@@ -147,6 +150,32 @@ export default function App() {
     }
 
     await loadCustomers(authToken);
+  };
+
+  const handleCreateWalkInCustomer = async (payload: {
+    name: string;
+    phone: string;
+    birthday: string;
+    addPoints: boolean;
+    pointsToEarn: number;
+  }) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch('/api/customers/walk-in', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể lưu khách vãng lai.');
+    }
   };
 
   if (authChecking) {
@@ -278,7 +307,11 @@ export default function App() {
 
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' ? (
-            <DashboardView key="dashboard" onNewCustomer={() => setIsNewCustomerModalOpen(true)} />
+            <DashboardView
+              key="dashboard"
+              onNewCustomer={() => setIsNewCustomerModalOpen(true)}
+              onNewWalkInCustomer={() => setIsWalkInCustomerModalOpen(true)}
+            />
           ) : activeTab === 'appointments' ? (
             <AppointmentsView key="appointments" onNewAppointment={() => setIsNewAppointmentModalOpen(true)} />
           ) : activeTab === 'customers' ? (
@@ -340,6 +373,16 @@ export default function App() {
           <NewCustomerModal
             onClose={() => setIsNewCustomerModalOpen(false)}
             onSave={handleCreateCustomer}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Walk-in Customer Modal */}
+      <AnimatePresence>
+        {isWalkInCustomerModalOpen && (
+          <WalkInCustomerModal
+            onClose={() => setIsWalkInCustomerModalOpen(false)}
+            onSave={handleCreateWalkInCustomer}
           />
         )}
       </AnimatePresence>

@@ -7,7 +7,8 @@ import authRouter from './routes/auth.routes';
 import customersRouter from './routes/customers.routes';
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);

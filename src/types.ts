@@ -11,6 +11,7 @@ export interface Customer {
   memberSince?: string;
   points?: number;
   maxPoints?: number;
+  isWalkIn?: boolean;
   spendingData?: { month: string; value: number }[];
   history?: { date: string; service: string; stylist: string; price: string }[];
 }

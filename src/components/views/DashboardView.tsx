@@ -20,6 +20,7 @@ import { cn } from '../../lib/utils';
 
 interface DashboardViewProps {
   onNewCustomer: () => void;
+  onNewWalkInCustomer: () => void;
   key?: string;
 }
 const today = new Date().toLocaleDateString('vi-VN', {
@@ -31,7 +32,7 @@ const today = new Date().toLocaleDateString('vi-VN', {
 
 const formattedDate = today.charAt(0).toUpperCase() + today.slice(1);
 
-export function DashboardView({ onNewCustomer }: DashboardViewProps) {
+export function DashboardView({ onNewCustomer, onNewWalkInCustomer }: DashboardViewProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -54,7 +55,9 @@ export function DashboardView({ onNewCustomer }: DashboardViewProps) {
             <Plus size={16} />
             Thêm khách hàng
           </button>
-          <button className="bg-stone-100 text-primary px-6 py-3 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-stone-200 transition-colors">
+          <button 
+            onClick={onNewWalkInCustomer}
+            className="bg-stone-100 text-primary px-6 py-3 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-stone-200 transition-colors">
             <Plus size={16} />
             Khách vãng lai
           </button>

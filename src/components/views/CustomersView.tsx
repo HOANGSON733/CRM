@@ -35,20 +35,26 @@ interface CustomersViewProps {
 }
 
 export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: CustomersViewProps) {
+  const [filterType, setFilterType] = useState<'all' | 'member' | 'walkin'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<any>(customers[0] || null);
+  const filteredCustomers = customers.filter((customer) => {
+    if (filterType === 'member') return !customer.isWalkIn;
+    if (filterType === 'walkin') return Boolean(customer.isWalkIn);
+    return true;
+  });
 
   React.useEffect(() => {
-    if (!customers.length) {
+    if (!filteredCustomers.length) {
       setSelectedCustomer(null);
       return;
     }
 
     setSelectedCustomer((prev: any) => {
-      if (!prev) return customers[0];
-      const matched = customers.find((item) => item.id === prev.id);
-      return matched || customers[0];
+      if (!prev) return filteredCustomers[0];
+      const matched = filteredCustomers.find((item) => item.id === prev.id);
+      return matched || filteredCustomers[0];
     });
-  }, [customers]);
+  }, [filteredCustomers]);
 
   return (
     <motion.div 
@@ -94,9 +100,39 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
               <button className="p-3 border border-stone-200 rounded-xl text-stone-500 hover:bg-stone-50 transition-colors">
                 <Filter size={18} />
               </button>
-              <div className="flex items-center gap-2 px-4 py-3 border border-stone-200 rounded-xl text-xs font-bold text-stone-600 cursor-pointer hover:bg-stone-50 transition-colors">
-                Sắp xếp: Mới nhất <ChevronDown size={14} />
-              </div>
+              <button
+                onClick={() => setFilterType('all')}
+                className={cn(
+                  "px-4 py-3 border rounded-xl text-xs font-bold transition-colors",
+                  filterType === 'all'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-stone-200 text-stone-600 hover:bg-stone-50"
+                )}
+              >
+                Tất cả
+              </button>
+              <button
+                onClick={() => setFilterType('member')}
+                className={cn(
+                  "px-4 py-3 border rounded-xl text-xs font-bold transition-colors",
+                  filterType === 'member'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-stone-200 text-stone-600 hover:bg-stone-50"
+                )}
+              >
+                Thành viên
+              </button>
+              <button
+                onClick={() => setFilterType('walkin')}
+                className={cn(
+                  "px-4 py-3 border rounded-xl text-xs font-bold transition-colors",
+                  filterType === 'walkin'
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-stone-200 text-stone-600 hover:bg-stone-50"
+                )}
+              >
+                Khách vãng lai
+              </button>
             </div>
           </div>
 
@@ -111,7 +147,7 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-50">
-                {customers.map((customer) => (
+                {filteredCustomers.map((customer) => (
                   <tr 
                     key={customer.id} 
                     onClick={() => setSelectedCustomer(customer)}
@@ -163,7 +199,12 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
               <div className="p-8 flex-1 overflow-y-auto space-y-8">
                 <div className="flex justify-between items-start">
                   <div className="flex gap-2">
-                    <span className="px-3 py-1 bg-secondary/10 text-secondary text-[10px] font-bold uppercase rounded-full">KHÁCH HÀNG VIP</span>
+                    <span className={cn(
+                      "px-3 py-1 text-[10px] font-bold uppercase rounded-full",
+                      selectedCustomer?.isWalkIn ? "bg-stone-100 text-stone-500" : "bg-secondary/10 text-secondary"
+                    )}>
+                      {selectedCustomer?.isWalkIn ? 'KHÁCH VÃNG LAI' : 'KHÁCH HÀNG VIP'}
+                    </span>
                     <button className="px-3 py-1 bg-stone-100 text-stone-500 text-[10px] font-bold uppercase rounded-full hover:bg-stone-200 transition-colors">Sửa</button>
                     <button 
                       onClick={() => onDeleteCustomer(selectedCustomer)}
