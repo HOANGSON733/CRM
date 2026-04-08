@@ -7,11 +7,58 @@ import { Employee } from '../../types';
 interface TerminateEmployeeModalProps {
   employee: Employee;
   onClose: () => void;
-  onConfirm: (type: 'temporary' | 'permanent') => void;
+  onConfirm: (payload: { type: 'temporary' | 'permanent'; effectiveDate: string; reason: string }) => Promise<void>;
+  onDelete: () => Promise<void>;
 }
 
-export function TerminateEmployeeModal({ employee, onClose, onConfirm }: TerminateEmployeeModalProps) {
+export function TerminateEmployeeModal({ employee, onClose, onConfirm, onDelete }: TerminateEmployeeModalProps) {
   const [leaveType, setLeaveType] = useState<'temporary' | 'permanent'>('temporary');
+  const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [reason, setReason] = useState('Lý do cá nhân');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    if (!effectiveDate) {
+      setErrorMessage('Vui lòng chọn ngày hiệu lực.');
+      return;
+    }
+
+    setErrorMessage('');
+    setIsSubmitting(true);
+    try {
+      await onConfirm({
+        type: leaveType,
+        effectiveDate,
+        reason,
+      });
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể cập nhật trạng thái nhân viên.';
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (isSubmitting || isDeleting) return;
+
+    setErrorMessage('');
+    setIsDeleting(true);
+    try {
+      await onDelete();
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể xóa nhân viên.';
+      setErrorMessage(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
@@ -102,8 +149,9 @@ export function TerminateEmployeeModal({ employee, onClose, onConfirm }: Termina
               <div className="relative">
                 <Calendar size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
                 <input 
-                  type="text" 
-                  defaultValue="11/01/2023"
+                  type="date"
+                  value={effectiveDate}
+                  onChange={(e) => setEffectiveDate(e.target.value)}
                   className="w-full bg-stone-50 border-none rounded-xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
                 />
               </div>
@@ -111,7 +159,11 @@ export function TerminateEmployeeModal({ employee, onClose, onConfirm }: Termina
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">LÝ DO CHÍNH</label>
               <div className="relative">
-                <select className="w-full bg-stone-50 border-none rounded-xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all appearance-none cursor-pointer">
+                <select
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full bg-stone-50 border-none rounded-xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all appearance-none cursor-pointer"
+                >
                   <option>Lý do cá nhân</option>
                   <option>Chuyển công tác</option>
                   <option>Vi phạm kỷ luật</option>
@@ -143,13 +195,22 @@ export function TerminateEmployeeModal({ employee, onClose, onConfirm }: Termina
 
           <div className="flex flex-col items-center gap-6 pt-4">
             <button 
-              onClick={() => onConfirm(leaveType)}
-              className="w-full bg-primary text-white py-5 rounded-2xl text-sm font-bold flex items-center justify-center gap-3 shadow-2xl hover:bg-primary-light transition-all active:scale-95"
+              onClick={handleConfirm}
+              disabled={isSubmitting || isDeleting}
+              className="w-full bg-primary text-white py-5 rounded-2xl text-sm font-bold flex items-center justify-center gap-3 shadow-2xl hover:bg-primary-light transition-all active:scale-95 disabled:opacity-60"
             >
-              Xác nhận cập nhật <ChevronDown size={18} className="-rotate-90" />
+              {isSubmitting ? 'Đang cập nhật...' : 'Xác nhận cập nhật'} <ChevronDown size={18} className="-rotate-90" />
+            </button>
+            <button
+              onClick={() => setIsDeleteConfirmOpen(true)}
+              disabled={isSubmitting || isDeleting}
+              className="w-full bg-red-600 text-white py-4 rounded-2xl text-sm font-bold hover:bg-red-700 transition-all active:scale-95 disabled:opacity-60"
+            >
+              {isDeleting ? 'Đang xóa...' : 'Xóa nhân viên vĩnh viễn'}
             </button>
             <button 
               onClick={onClose}
+              disabled={isSubmitting || isDeleting}
               className="text-sm font-bold text-stone-400 hover:text-stone-600 transition-colors"
             >
               Hủy bỏ
@@ -157,8 +218,44 @@ export function TerminateEmployeeModal({ employee, onClose, onConfirm }: Termina
           </div>
 
           <p className="text-center text-[9px] font-bold text-stone-300 uppercase tracking-[0.2em]">HỆ THỐNG QUẢN LÝ ATELIER LUXURY SALON & SPA</p>
+          {errorMessage && <p className="text-center text-xs font-bold text-red-500">{errorMessage}</p>}
         </div>
       </motion.div>
+
+      {isDeleteConfirmOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-stone-900/50 backdrop-blur-sm flex items-center justify-center p-6"
+        >
+          <div className="w-full max-w-lg bg-white rounded-3xl p-8 space-y-6 shadow-2xl">
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">Xác nhận xóa</p>
+              <h3 className="text-2xl font-serif text-primary">Bạn chắc chắn muốn xóa nhân viên này?</h3>
+              <p className="text-sm text-stone-500">
+                Sau khi xóa, hồ sơ của <span className="font-bold text-primary">{employee.name}</span> sẽ bị xóa vĩnh viễn và không thể khôi phục.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                disabled={isDeleting}
+                className="flex-1 py-3 rounded-xl bg-stone-100 text-stone-600 text-sm font-bold hover:bg-stone-200 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 py-3 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-60"
+              >
+                {isDeleting ? 'Đang xóa...' : 'Xác nhận xóa'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

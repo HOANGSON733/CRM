@@ -49,15 +49,60 @@ import { DeleteServiceModal } from './components/modals/DeleteServiceModal';
 import { NewPromoCodeModal } from './components/modals/NewPromoCodeModal';
 import { Employee, Service } from './types';
 
+const TAB_PATHS: Partial<Record<View, string>> = {
+  dashboard: '/dashboard',
+  appointments: '/appointments',
+  customers: '/customers',
+  employees: '/employees',
+  'employee-profile': '/employees/profile',
+  services: '/services',
+  reports: '/reports',
+  pos: '/pos',
+  settings: '/settings',
+  marketing: '/marketing',
+  login: '/login',
+};
+
+function getTabFromPath(pathname: string): View {
+  switch (pathname) {
+    case '/':
+    case '/dashboard':
+      return 'dashboard';
+    case '/appointments':
+      return 'appointments';
+    case '/customers':
+      return 'customers';
+    case '/employees':
+      return 'employees';
+    case '/employees/profile':
+      return 'employee-profile';
+    case '/services':
+      return 'services';
+    case '/reports':
+      return 'reports';
+    case '/pos':
+      return 'pos';
+    case '/settings':
+      return 'settings';
+    case '/marketing':
+      return 'marketing';
+    case '/login':
+      return 'login';
+    default:
+      return 'dashboard';
+  }
+}
+
 export default function App() {
   const [authChecking, setAuthChecking] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
-  const [activeTab, setActiveTab] = useState<View>('dashboard');
+  const [activeTab, setActiveTab] = useState<View>(() => getTabFromPath(window.location.pathname));
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const [isWalkInCustomerModalOpen, setIsWalkInCustomerModalOpen] = useState(false);
   const [isNewEmployeeModalOpen, setIsNewEmployeeModalOpen] = useState(false);
+  const [isEditEmployeeModalOpen, setIsEditEmployeeModalOpen] = useState(false);
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
   const [isNewPromoCodeModalOpen, setIsNewPromoCodeModalOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
@@ -67,6 +112,7 @@ export default function App() {
   const [customerToDelete, setCustomerToDelete] = useState<any>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
 
   const loadCustomers = async (token: string) => {
     const response = await fetch('/api/customers', {
@@ -78,6 +124,18 @@ export default function App() {
     }
     const data = await response.json();
     setCustomers(Array.isArray(data?.customers) ? data.customers : []);
+  };
+
+  const loadEmployees = async (token: string) => {
+    const response = await fetch('/api/employees', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tải danh sách nhân viên.');
+    }
+    const data = await response.json();
+    setEmployees(Array.isArray(data?.employees) ? data.employees : []);
   };
 
   useEffect(() => {
@@ -95,11 +153,13 @@ export default function App() {
         if (!response.ok) throw new Error('Invalid token');
         setIsLoggedIn(true);
         await loadCustomers(authToken);
+        await loadEmployees(authToken);
       } catch (_error) {
         localStorage.removeItem('auth_token');
         setAuthToken(null);
         setIsLoggedIn(false);
         setCustomers([]);
+        setEmployees([]);
       } finally {
         setAuthChecking(false);
       }
@@ -119,6 +179,11 @@ export default function App() {
     setAuthToken(null);
     setIsLoggedIn(false);
     setCustomers([]);
+    setEmployees([]);
+  };
+
+  const navigateToTab = (tab: View) => {
+    setActiveTab(tab);
   };
 
   const handleCreateCustomer = async (payload: {
@@ -127,6 +192,7 @@ export default function App() {
     email: string;
     birthday: string;
     gender: string;
+    assignedEmployee: string;
     source: string;
     notes: string;
     avatar?: string;
@@ -156,6 +222,7 @@ export default function App() {
     name: string;
     phone: string;
     birthday: string;
+    assignedEmployee: string;
     addPoints: boolean;
     pointsToEarn: number;
   }) => {
@@ -178,6 +245,147 @@ export default function App() {
     }
   };
 
+  const handleCreateEmployee = async (payload: {
+    name: string;
+    phone: string;
+    email: string;
+    role: string;
+    commissionRate: number;
+    specialties: string[];
+    startDate: string;
+    defaultShift: string;
+    avatar?: string;
+  }) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch('/api/employees', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tạo nhân viên mới.');
+    }
+
+    await loadEmployees(authToken);
+  };
+
+  const handleUpdateEmployee = async (payload: {
+    name: string;
+    phone: string;
+    email: string;
+    role: string;
+    commissionRate: number;
+    specialties: string[];
+    startDate: string;
+    defaultShift: string;
+    avatar?: string;
+  }) => {
+    if (!authToken || !selectedEmployee) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch(`/api/employees/${selectedEmployee.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể cập nhật nhân viên.');
+    }
+
+    await loadEmployees(authToken);
+    setSelectedEmployee((prev) => (prev ? { ...prev, ...payload } : prev));
+  };
+
+  const handleTerminateEmployee = async (payload: {
+    type: 'temporary' | 'permanent';
+    effectiveDate: string;
+    reason: string;
+  }) => {
+    if (!authToken || !selectedEmployee) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch(`/api/employees/${selectedEmployee.id}/terminate`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể cập nhật trạng thái nghỉ việc.');
+    }
+
+    await loadEmployees(authToken);
+    navigateToTab('employees');
+    setIsTerminateModalOpen(false);
+    setSelectedEmployee(null);
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!authToken || !selectedEmployee) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch(`/api/employees/${selectedEmployee.id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể xóa nhân viên.');
+    }
+
+    await loadEmployees(authToken);
+    navigateToTab('employees');
+    setIsTerminateModalOpen(false);
+    setSelectedEmployee(null);
+  };
+
+  useEffect(() => {
+    const onPopState = () => {
+      const tabFromPath = getTabFromPath(window.location.pathname);
+      setActiveTab(tabFromPath);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const nextPath = TAB_PATHS[activeTab] || '/dashboard';
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, '', nextPath);
+    }
+  }, [activeTab, isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    if (activeTab === 'employee-profile' && !selectedEmployee) {
+      setActiveTab('employees');
+    }
+  }, [activeTab, selectedEmployee, isLoggedIn]);
+
   if (authChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-stone-50 text-stone-500 text-sm font-bold tracking-wider">
@@ -187,6 +395,9 @@ export default function App() {
   }
 
   if (!isLoggedIn) {
+    if (window.location.pathname !== '/login') {
+      window.history.replaceState({}, '', '/login');
+    }
     return <LoginView onLogin={handleLogin} />;
   }
 
@@ -204,55 +415,55 @@ export default function App() {
             icon={<LayoutDashboard size={20} />} 
             label="Tổng quan" 
             active={activeTab === 'dashboard'} 
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => navigateToTab('dashboard')}
           />
           <SidebarItem 
             icon={<CalendarDays size={20} />} 
             label="Lịch hẹn" 
             active={activeTab === 'appointments'} 
-            onClick={() => setActiveTab('appointments')}
+            onClick={() => navigateToTab('appointments')}
           />
           <SidebarItem 
             icon={<Users size={20} />} 
             label="Khách hàng" 
             active={activeTab === 'customers'} 
-            onClick={() => setActiveTab('customers')}
+            onClick={() => navigateToTab('customers')}
           />
           <SidebarItem 
             icon={<Scissors size={20} />} 
             label="Nhân viên" 
             active={activeTab === 'employees' || activeTab === 'employee-profile'}
-            onClick={() => setActiveTab('employees')}
+            onClick={() => navigateToTab('employees')}
           />
           <SidebarItem 
             icon={<ClipboardList size={20} />} 
             label="Dịch vụ & Giá" 
             active={activeTab === 'services'}
-            onClick={() => setActiveTab('services')}
+            onClick={() => navigateToTab('services')}
           />
           <SidebarItem 
             icon={<BarChart3 size={20} />} 
             label="Báo cáo" 
             active={activeTab === 'reports'}
-            onClick={() => setActiveTab('reports')}
+            onClick={() => navigateToTab('reports')}
           />
           <SidebarItem 
             icon={<Megaphone size={20} />} 
             label="Tích điểm & Marketing" 
             active={activeTab === 'marketing'}
-            onClick={() => setActiveTab('marketing')}
+            onClick={() => navigateToTab('marketing')}
           />
           <SidebarItem 
             icon={<CreditCard size={20} />} 
             label="POS & Thanh toán" 
             active={activeTab === 'pos'}
-            onClick={() => setActiveTab('pos')}
+            onClick={() => navigateToTab('pos')}
           />
           <SidebarItem 
             icon={<Settings size={20} />} 
             label="Hệ thống" 
             active={activeTab === 'settings'}
-            onClick={() => setActiveTab('settings')}
+            onClick={() => navigateToTab('settings')}
           />
         </nav>
 
@@ -324,18 +535,20 @@ export default function App() {
           ) : activeTab === 'employees' ? (
             <EmployeesView 
               key="employees" 
+              employees={employees}
               onNewEmployee={() => setIsNewEmployeeModalOpen(true)} 
               onViewProfile={(emp) => {
                 setSelectedEmployee(emp);
-                setActiveTab('employee-profile');
+                navigateToTab('employee-profile');
               }} 
             />
           ) : activeTab === 'employee-profile' && selectedEmployee ? (
             <EmployeeProfileView 
               key="employee-profile"
               employee={selectedEmployee}
-              onBack={() => setActiveTab('employees')}
+              onBack={() => navigateToTab('employees')}
               onAddShift={() => setIsAddShiftModalOpen(true)}
+              onEdit={() => setIsEditEmployeeModalOpen(true)}
               onTerminate={() => setIsTerminateModalOpen(true)}
             />
           ) : activeTab === 'services' ? (
@@ -411,7 +624,34 @@ export default function App() {
       {/* New Employee Modal */}
       <AnimatePresence>
         {isNewEmployeeModalOpen && (
-          <NewEmployeeModal onClose={() => setIsNewEmployeeModalOpen(false)} />
+          <NewEmployeeModal
+            onClose={() => setIsNewEmployeeModalOpen(false)}
+            onSave={handleCreateEmployee}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Edit Employee Modal */}
+      <AnimatePresence>
+        {isEditEmployeeModalOpen && selectedEmployee && (
+          <NewEmployeeModal
+            onClose={() => setIsEditEmployeeModalOpen(false)}
+            onSave={handleUpdateEmployee}
+            title="Cập Nhật Nhân Viên"
+            description="Điều chỉnh hồ sơ nhân viên để thông tin luôn chính xác cho vận hành và chăm sóc khách hàng."
+            saveLabel="Cập nhật nhân viên"
+            initialData={{
+              name: selectedEmployee.name || '',
+              phone: selectedEmployee.phone || '',
+              email: selectedEmployee.email || '',
+              role: selectedEmployee.role || 'Senior Stylist',
+              commissionRate: Number(selectedEmployee.commissionRate || 0),
+              specialties: selectedEmployee.specialties || [],
+              startDate: selectedEmployee.startDate || '',
+              defaultShift: selectedEmployee.defaultShift || 'Ca Sáng (08:00 - 16:00)',
+              avatar: selectedEmployee.avatar || '',
+            }}
+          />
         )}
       </AnimatePresence>
 
@@ -421,11 +661,8 @@ export default function App() {
           <TerminateEmployeeModal 
             employee={selectedEmployee}
             onClose={() => setIsTerminateModalOpen(false)}
-            onConfirm={(type) => {
-              console.log('Terminating employee:', selectedEmployee.name, 'Type:', type);
-              setIsTerminateModalOpen(false);
-              setActiveTab('employees');
-            }}
+            onConfirm={handleTerminateEmployee}
+            onDelete={handleDeleteEmployee}
           />
         )}
       </AnimatePresence>

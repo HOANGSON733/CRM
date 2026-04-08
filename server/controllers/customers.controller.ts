@@ -24,6 +24,7 @@ export async function createCustomer(req: Request, res: Response) {
     const email = String(req.body?.email || '').trim();
     const birthday = String(req.body?.birthday || '').trim();
     const gender = String(req.body?.gender || '').trim();
+    const assignedEmployee = String(req.body?.assignedEmployee || '').trim();
     const source = String(req.body?.source || '').trim();
     const notes = String(req.body?.notes || '').trim();
     const avatar = String(req.body?.avatar || '').trim();
@@ -50,10 +51,11 @@ export async function createCustomer(req: Request, res: Response) {
       email,
       birthday,
       gender,
+      assignedEmployee,
       source,
       notes,
       tags: walkInRecord ? ['#Khách mới', '#Chuyển đổi vãng lai'] : ['#Khách mới'],
-      avatar: avatar || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+      avatar: avatar || 'https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg',
       lastVisit: formatDateVi(now),
       memberSince: `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`,
       points: convertedPoints,
@@ -119,7 +121,7 @@ export async function listCustomers(req: Request, res: Response) {
         lastVisit: customer.lastVisit || '',
         avatar:
           customer.avatar ||
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+          'https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg',
         memberSince: customer.memberSince,
         points: customer.points,
         maxPoints: customer.maxPoints,
@@ -136,7 +138,7 @@ export async function listCustomers(req: Request, res: Response) {
         email: '',
         lastVisit: formatDateVi(new Date(customer.createdAt || Date.now())),
         avatar:
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+          'https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg',
         memberSince: undefined,
         points: customer.addPoints ? customer.pointsToEarn || 0 : 0,
         maxPoints: 5000,
@@ -168,6 +170,7 @@ export async function createWalkInCustomer(req: Request, res: Response) {
     const name = String(req.body?.name || '').trim();
     const phone = normalizePhone(String(req.body?.phone || '').trim());
     const birthday = String(req.body?.birthday || '').trim();
+    const assignedEmployee = String(req.body?.assignedEmployee || '').trim();
     const addPoints = Boolean(req.body?.addPoints);
     const pointsToEarn = Number(req.body?.pointsToEarn || 0);
 
@@ -185,6 +188,7 @@ export async function createWalkInCustomer(req: Request, res: Response) {
       name,
       phone,
       birthday,
+      assignedEmployee,
       addPoints,
       pointsToEarn,
       source: 'Khách vãng lai',

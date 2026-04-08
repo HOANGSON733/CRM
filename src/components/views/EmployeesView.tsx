@@ -11,17 +11,40 @@ import {
   Clock 
 } from 'lucide-react';
 import { KPICard } from '../KPICard';
-import { employeesData, staffPerformanceData } from '../../data/mockData';
+import { staffPerformanceData } from '../../data/mockData';
 import { cn } from '../../lib/utils';
 import { Employee } from '../../types';
 
 interface EmployeesViewProps {
+  employees: Employee[];
   onNewEmployee: () => void;
   onViewProfile: (employee: Employee) => void;
   key?: string;
 }
 
-export function EmployeesView({ onNewEmployee, onViewProfile }: EmployeesViewProps) {
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(-2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('');
+}
+
+function getStatusBadge(status: Employee['status']) {
+  if (status === 'terminated') {
+    return { label: 'NGHỈ VIỆC', className: 'bg-red-600 text-white' };
+  }
+  if (status === 'on-leave') {
+    return { label: 'TẠM NGHỈ', className: 'bg-amber-500 text-white' };
+  }
+  if (status === 'busy') {
+    return { label: 'ĐANG BẬN', className: 'bg-primary text-white' };
+  }
+  return { label: 'RẢNH', className: 'bg-secondary text-white' };
+}
+
+export function EmployeesView({ employees, onNewEmployee, onViewProfile }: EmployeesViewProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -49,12 +72,22 @@ export function EmployeesView({ onNewEmployee, onViewProfile }: EmployeesViewPro
         <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-stone-100 flex items-center gap-6">
           <div className="flex-1 space-y-2">
             <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest">ĐỘI NGŨ HIỆN TẠI</p>
-            <h3 className="text-4xl font-serif text-primary">24 Nhân Sự</h3>
+            <h3 className="text-4xl font-serif text-primary">{employees.length} Nhân Sự</h3>
             <div className="flex -space-x-3">
-              {employeesData.map((emp, i) => (
-                <img key={i} src={emp.avatar} alt={emp.name} className="w-10 h-10 rounded-full border-2 border-white object-cover" />
+              {employees.slice(0, 4).map((emp, i) => (
+                emp.avatar ? (
+                  <img key={i} src={emp.avatar} alt={emp.name} className="w-10 h-10 rounded-full border-2 border-white object-cover" />
+                ) : (
+                  <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-primary text-white flex items-center justify-center text-[10px] font-bold">
+                    {getInitials(emp.name)}
+                  </div>
+                )
               ))}
-              <div className="w-10 h-10 rounded-full border-2 border-white bg-secondary/10 flex items-center justify-center text-[10px] font-bold text-secondary">+12</div>
+              {employees.length > 4 && (
+                <div className="w-10 h-10 rounded-full border-2 border-white bg-secondary/10 flex items-center justify-center text-[10px] font-bold text-secondary">
+                  +{employees.length - 4}
+                </div>
+              )}
             </div>
           </div>
           <div className="w-px h-20 bg-stone-100" />
@@ -96,20 +129,28 @@ export function EmployeesView({ onNewEmployee, onViewProfile }: EmployeesViewPro
 
       {/* Employee Grid */}
       <div className="grid grid-cols-4 gap-8">
-        {employeesData.map((employee) => (
+        {employees.map((employee) => {
+          const badge = getStatusBadge(employee.status);
+          return (
           <motion.div 
             key={employee.id}
             whileHover={{ y: -10 }}
             className="bg-white rounded-[2.5rem] shadow-sm border border-stone-100 overflow-hidden group"
           >
             <div className="relative h-64 overflow-hidden">
-              <img src={employee.avatar} alt={employee.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              {employee.avatar ? (
+                <img src={employee.avatar} alt={employee.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              ) : (
+                <div className="w-full h-full bg-stone-100 flex items-center justify-center">
+                  <span className="text-5xl font-serif text-primary">{getInitials(employee.name)}</span>
+                </div>
+              )}
               <div className="absolute top-4 right-4">
                 <span className={cn(
                   "px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest",
-                  employee.status === 'available' ? "bg-secondary text-white" : "bg-primary text-white"
+                  badge.className
                 )}>
-                  {employee.status === 'available' ? 'RẢNH' : 'ĐANG BẬN'}
+                  {badge.label}
                 </span>
               </div>
             </div>
@@ -140,7 +181,8 @@ export function EmployeesView({ onNewEmployee, onViewProfile }: EmployeesViewPro
               </div>
             </div>
           </motion.div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Performance Dashboard */}

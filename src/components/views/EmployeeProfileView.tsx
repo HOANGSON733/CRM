@@ -1,15 +1,14 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { 
-  X, 
   Phone, 
+  Mail,
   Calendar as CalendarIcon, 
   Star, 
   Award, 
   ChevronLeft, 
   Clock, 
   CheckCircle2, 
-  ArrowRight, 
   Edit3,
   UserMinus
 } from 'lucide-react';
@@ -20,11 +19,21 @@ interface EmployeeProfileViewProps {
   employee: Employee;
   onBack: () => void;
   onAddShift: () => void;
+  onEdit: () => void;
   onTerminate: () => void;
   key?: string;
 }
 
-export function EmployeeProfileView({ employee, onBack, onAddShift, onTerminate }: EmployeeProfileViewProps) {
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(-2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('');
+}
+
+export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTerminate }: EmployeeProfileViewProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
@@ -35,7 +44,13 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onTerminate 
       {/* Profile Header */}
       <div className="bg-white rounded-[3rem] shadow-xl border border-stone-100 overflow-hidden flex h-[500px]">
         <div className="w-1/3 relative overflow-hidden">
-          <img src={employee.avatar} alt={employee.name} className="w-full h-full object-cover" />
+          {employee.avatar ? (
+            <img src={employee.avatar} alt={employee.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-stone-100 flex items-center justify-center">
+              <span className="text-7xl font-serif text-primary">{getInitials(employee.name)}</span>
+            </div>
+          )}
           <button 
             onClick={onBack}
             className="absolute top-8 left-8 w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 hover:bg-white/40 transition-all"
@@ -51,6 +66,30 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onTerminate 
               {employee.bio}
             </p>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Số điện thoại</p>
+              <p className="text-sm font-bold text-primary flex items-center gap-2">
+                <Phone size={15} className="text-secondary" />
+                {employee.phone || 'Chưa cập nhật'}
+              </p>
+            </div>
+            <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Email</p>
+              <p className="text-sm font-bold text-primary flex items-center gap-2 truncate">
+                <Mail size={15} className="text-secondary shrink-0" />
+                <span className="truncate">{employee.email || 'Chưa cập nhật'}</span>
+              </p>
+            </div>
+            <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Ngày bắt đầu</p>
+              <p className="text-sm font-bold text-primary">{employee.startDate || 'Chưa cập nhật'}</p>
+            </div>
+            <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Ca mặc định</p>
+              <p className="text-sm font-bold text-primary">{employee.defaultShift || 'Chưa cập nhật'}</p>
+            </div>
+          </div>
           <div className="flex gap-4">
             <button 
               onClick={onAddShift}
@@ -59,7 +98,10 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onTerminate 
               <CalendarIcon size={20} />
               Đặt Lịch Làm Việc
             </button>
-            <button className="bg-stone-50 text-stone-600 px-10 py-5 rounded-2xl text-sm font-bold flex items-center gap-3 hover:bg-stone-100 transition-all">
+            <button
+              onClick={onEdit}
+              className="bg-stone-50 text-stone-600 px-10 py-5 rounded-2xl text-sm font-bold flex items-center gap-3 hover:bg-stone-100 transition-all"
+            >
               <Edit3 size={20} />
               Sửa Thông Tin
             </button>

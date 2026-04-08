@@ -1,15 +1,59 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Calendar, Clock, ChevronDown, CheckCircle2, Image as ImageIcon, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface NewEmployeeModalProps {
   onClose: () => void;
+  initialData?: {
+    name: string;
+    phone: string;
+    email: string;
+    role: string;
+    commissionRate: number;
+    specialties: string[];
+    startDate: string;
+    defaultShift: string;
+    avatar?: string;
+  };
+  saveLabel?: string;
+  title?: string;
+  description?: string;
+  onSave: (payload: {
+    name: string;
+    phone: string;
+    email: string;
+    role: string;
+    commissionRate: number;
+    specialties: string[];
+    startDate: string;
+    defaultShift: string;
+    avatar?: string;
+  }) => Promise<void>;
 }
 
-export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
-  const [specialties, setSpecialties] = useState(['Cắt tóc', 'Nhuộm']);
+export function NewEmployeeModal({
+  onClose,
+  onSave,
+  initialData,
+  saveLabel = 'Lưu nhân viên',
+  title = 'Thêm Nhân Viên Mới',
+  description = 'Chào mừng thành viên mới gia nhập không gian nghệ thuật Atelier Salon. Hãy hoàn tất hồ sơ để bắt đầu hành trình sáng tạo.',
+}: NewEmployeeModalProps) {
+  const [specialties, setSpecialties] = useState(initialData?.specialties?.length ? initialData.specialties : ['Cắt tóc', 'Nhuộm']);
   const availableSpecialties = ['Uốn', 'Duỗi', 'Phục hồi'];
+  const [name, setName] = useState(initialData?.name || '');
+  const [phone, setPhone] = useState(initialData?.phone || '');
+  const [email, setEmail] = useState(initialData?.email || '');
+  const [role, setRole] = useState(initialData?.role || 'Senior Stylist');
+  const [commissionRate, setCommissionRate] = useState(String(initialData?.commissionRate ?? 15));
+  const [startDate, setStartDate] = useState(initialData?.startDate || '');
+  const [defaultShift, setDefaultShift] = useState(initialData?.defaultShift || 'Ca Sáng (08:00 - 16:00)');
+  const [avatar, setAvatar] = useState<string | undefined>(initialData?.avatar || undefined);
+  const [avatarName, setAvatarName] = useState(initialData?.avatar ? 'Ảnh hiện tại' : '');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const toggleSpecialty = (spec: string) => {
     if (specialties.includes(spec)) {
@@ -17,6 +61,61 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
     } else {
       setSpecialties([...specialties, spec]);
     }
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    if (!name.trim() || !phone.trim()) {
+      setErrorMessage('Vui lòng nhập họ tên và số điện thoại.');
+      return;
+    }
+    setErrorMessage('');
+    setIsSaving(true);
+    try {
+      await onSave({
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        role,
+        commissionRate: Number(commissionRate || 0),
+        specialties,
+        startDate,
+        defaultShift,
+        avatar,
+      });
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể lưu nhân viên.';
+      setErrorMessage(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleChooseAvatar = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Vui lòng chọn file ảnh hợp lệ.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('Ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatar(String(reader.result || ''));
+      setAvatarName(file.name);
+      setErrorMessage('');
+    };
+    reader.onerror = () => setErrorMessage('Không thể đọc file ảnh. Vui lòng thử lại.');
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -38,19 +137,36 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
         {/* Left Side - Info */}
         <div className="w-2/5 bg-primary p-16 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="relative z-10 space-y-6">
-            <h2 className="text-5xl font-serif leading-tight">Thêm Nhân Viên Mới</h2>
+            <h2 className="text-5xl font-serif leading-tight">{title}</h2>
             <p className="text-white/60 text-sm leading-relaxed">
-              Chào mừng thành viên mới gia nhập không gian nghệ thuật Atelier Salon. Hãy hoàn tất hồ sơ để bắt đầu hành trình sáng tạo.
+              {description}
             </p>
           </div>
 
           <div className="relative z-10 space-y-4">
-            <div className="w-32 h-32 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all">
-              <div className="text-center">
-                <ImageIcon size={32} className="mx-auto mb-2 opacity-40" />
-                <p className="text-[8px] font-bold uppercase tracking-widest opacity-40">Tải ảnh lên</p>
-              </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <div
+              onClick={handleChooseAvatar}
+              className="w-32 h-32 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all overflow-hidden"
+            >
+              {avatar ? (
+                <img src={avatar} alt="Employee avatar preview" className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-center">
+                  <ImageIcon size={32} className="mx-auto mb-2 opacity-40" />
+                  <p className="text-[8px] font-bold uppercase tracking-widest opacity-40">Tải ảnh lên</p>
+                </div>
+              )}
             </div>
+            {avatarName && (
+              <p className="text-[10px] font-bold text-white/70 tracking-wide truncate max-w-[220px]">{avatarName}</p>
+            )}
             <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest italic">Kích thước khuyên dùng: 500x500px</p>
           </div>
 
@@ -75,6 +191,8 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
               <input 
                 type="text" 
                 placeholder="Nguyễn Văn A"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
               />
             </div>
@@ -83,6 +201,8 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
               <input 
                 type="text" 
                 placeholder="0901 234 567"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
               />
             </div>
@@ -93,6 +213,8 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
             <input 
               type="email" 
               placeholder="artist@atelier.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
             />
           </div>
@@ -101,7 +223,11 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">CẤP BẬC (ROLE)</label>
               <div className="relative">
-                <select className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all appearance-none cursor-pointer">
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all appearance-none cursor-pointer"
+                >
                   <option>Senior Stylist</option>
                   <option>Master Stylist</option>
                   <option>Junior Artist</option>
@@ -115,7 +241,8 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
               <div className="relative">
                 <input 
                   type="text" 
-                  defaultValue="15"
+                  value={commissionRate}
+                  onChange={(e) => setCommissionRate(e.target.value)}
                   className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
                 />
                 <span className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 font-bold">%</span>
@@ -153,8 +280,9 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
               <div className="relative">
                 <Calendar size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
                 <input 
-                  type="text" 
-                  placeholder="mm/dd/yyyy"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
                 />
               </div>
@@ -163,7 +291,11 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
               <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">CA MẶC ĐỊNH</label>
               <div className="relative">
                 <Clock size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
-                <select className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all appearance-none cursor-pointer">
+                <select
+                  value={defaultShift}
+                  onChange={(e) => setDefaultShift(e.target.value)}
+                  className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all appearance-none cursor-pointer"
+                >
                   <option>Ca Sáng (08:00 - 16:00)</option>
                   <option>Ca Chiều (14:00 - 22:00)</option>
                   <option>Ca Gãy (Linh hoạt)</option>
@@ -180,13 +312,15 @@ export function NewEmployeeModal({ onClose }: NewEmployeeModalProps) {
               Hủy bỏ
             </button>
             <button 
-              onClick={onClose}
-              className="bg-primary text-white px-10 py-5 rounded-2xl text-sm font-bold flex items-center gap-3 shadow-2xl hover:bg-primary-light transition-all active:scale-95"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-primary text-white px-10 py-5 rounded-2xl text-sm font-bold flex items-center gap-3 shadow-2xl hover:bg-primary-light transition-all active:scale-95 disabled:opacity-60"
             >
               <CheckCircle2 size={20} />
-              Lưu nhân viên
+              {isSaving ? 'Đang lưu...' : saveLabel}
             </button>
           </div>
+          {errorMessage && <p className="text-xs font-bold text-red-500">{errorMessage}</p>}
         </div>
       </motion.div>
     </div>

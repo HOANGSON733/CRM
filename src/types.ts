@@ -39,13 +39,18 @@ export interface ScheduleItem {
 }
 
 export interface Employee {
-  id: number;
+  id: string | number;
   name: string;
   role: string;
+  phone?: string;
+  email?: string;
+  commissionRate?: number;
   rating: number;
   avatar: string;
-  status: 'available' | 'busy';
+  status: 'available' | 'busy' | 'on-leave' | 'terminated';
   specialties: string[];
+  startDate?: string;
+  defaultShift?: string;
   bio?: string;
   monthlyRevenue?: string;
   rebookingRate?: string;

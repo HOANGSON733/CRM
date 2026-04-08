@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Upload } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { employeesData } from '../../data/mockData';
 
 interface NewCustomerModalProps {
   onClose: () => void;
@@ -11,6 +12,7 @@ interface NewCustomerModalProps {
     email: string;
     birthday: string;
     gender: string;
+    assignedEmployee: string;
     source: string;
     notes: string;
     avatar?: string;
@@ -24,6 +26,7 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
   const [email, setEmail] = useState('');
   const [birthday, setBirthday] = useState('');
   const [gender, setGender] = useState('Nữ');
+  const [assignedEmployee, setAssignedEmployee] = useState(employeesData[0]?.name || '');
   const [notes, setNotes] = useState('');
   const [avatar, setAvatar] = useState<string | undefined>(undefined);
   const [avatarName, setAvatarName] = useState('');
@@ -74,6 +77,7 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
         email: email.trim(),
         birthday,
         gender,
+        assignedEmployee,
         source: selectedSource,
         notes: notes.trim(),
         avatar,
@@ -111,7 +115,7 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
           
           <div className="absolute inset-0 opacity-40">
             <img 
-              src="https://images.unsplash.com/photo-1562322140-8baeececf3df?w=800&h=1200&fit=crop" 
+              src="https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg" 
               alt="Salon Interior" 
               className="w-full h-full object-cover"
             />
@@ -172,6 +176,20 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">NHÂN VIÊN PHỤ TRÁCH</label>
+                <select
+                  value={assignedEmployee}
+                  onChange={(e) => setAssignedEmployee(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all appearance-none"
+                >
+                  {employeesData.map((employee) => (
+                    <option key={employee.id} value={employee.name}>
+                      {employee.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

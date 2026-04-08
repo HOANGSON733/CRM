@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { X, UserPlus, ShieldCheck, Calendar, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { employeesData } from '../../data/mockData';
 
 interface WalkInCustomerModalProps {
   onClose: () => void;
-  onSave: (data: { name: string; phone: string; birthday: string; addPoints: boolean; pointsToEarn: number }) => Promise<void>;
+  onSave: (data: { name: string; phone: string; birthday: string; assignedEmployee: string; addPoints: boolean; pointsToEarn: number }) => Promise<void>;
   pointsToEarn?: number;
 }
 
@@ -13,6 +14,7 @@ export function WalkInCustomerModal({ onClose, onSave, pointsToEarn = 230 }: Wal
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [birthday, setBirthday] = useState('');
+  const [assignedEmployee, setAssignedEmployee] = useState(employeesData[0]?.name || '');
   const [addPoints, setAddPoints] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -27,7 +29,7 @@ export function WalkInCustomerModal({ onClose, onSave, pointsToEarn = 230 }: Wal
     setIsSaving(true);
     setErrorMessage('');
     try {
-      await onSave({ name: name.trim(), phone: phone.trim(), birthday, addPoints, pointsToEarn });
+      await onSave({ name: name.trim(), phone: phone.trim(), birthday, assignedEmployee, addPoints, pointsToEarn });
       onClose();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể lưu khách vãng lai.';
@@ -116,6 +118,22 @@ export function WalkInCustomerModal({ onClose, onSave, pointsToEarn = 230 }: Wal
               />
               <Calendar size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400" />
             </div>
+          </div>
+          <div className="space-y-3">
+            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+              NHÂN VIÊN PHỤ TRÁCH
+            </label>
+            <select
+              value={assignedEmployee}
+              onChange={(e) => setAssignedEmployee(e.target.value)}
+              className="w-full bg-white border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none appearance-none"
+            >
+              {employeesData.map((employee) => (
+                <option key={employee.id} value={employee.name}>
+                  {employee.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Points Info Box */}
