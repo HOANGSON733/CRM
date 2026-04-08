@@ -172,6 +172,10 @@ export default function App() {
     localStorage.setItem('auth_token', token);
     setAuthToken(token);
     setIsLoggedIn(true);
+    setActiveTab('dashboard');
+    if (window.location.pathname !== '/dashboard') {
+      window.history.replaceState({}, '', '/dashboard');
+    }
   };
 
   const handleLogout = () => {
