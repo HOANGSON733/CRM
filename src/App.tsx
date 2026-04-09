@@ -37,6 +37,7 @@ import { POSView } from './components/views/POSView';
 import { SettingsView } from './components/views/SettingsView';
 import { MarketingView } from './components/views/MarketingView';
 import { LoginView } from './components/views/LoginView';
+import { ProductsView } from './components/views/ProductsView';
 import { NewAppointmentModal } from './components/modals/NewAppointmentModal';
 import { NewCustomerModal } from './components/modals/NewCustomerModal';
 import { WalkInCustomerModal } from './components/modals/WalkInCustomerModal';

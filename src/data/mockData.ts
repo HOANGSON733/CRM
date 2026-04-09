@@ -1,5 +1,30 @@
-import { Customer, Appointment, ScheduleItem, Employee, ServiceCategory } from '../types';
-
+import { Customer, Appointment, ScheduleItem, Employee, ServiceCategory, Product } from '../types';
+export const productsData: Product[] = [
+  {
+    id: 1,
+    name: 'Serum Keratin Phục Hồi',
+    brand: 'Bella Luxury Care',
+    category: 'SERUM & TINH DẦU',
+    sellingPrice: '450.000',
+    costPrice: '310.000',
+    stock: 12,
+    maxStock: 20,
+    image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&q=80&w=400',
+    status: 'in-stock'
+  },
+  {
+    id: 2,
+    name: 'Gội Xả Thảo Mộc',
+    brand: 'Botanical Care',
+    category: 'TINH DẦU',
+    sellingPrice: '320.000',
+    costPrice: '220.000',
+    stock: 5,
+    maxStock: 10,
+    image: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?auto=format&fit=crop&q=80&w=400',
+    status: 'in-stock'
+  }
+];
 export const servicesData: ServiceCategory[] = [
   {
     id: 1,
