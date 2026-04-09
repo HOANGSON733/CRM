@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { Customer, View } from './types';
+import { servicesData } from './data/mockData';
 
 // Components
 import { SidebarItem } from './components/SidebarItem';
@@ -46,6 +47,7 @@ import { TerminateEmployeeModal } from './components/modals/TerminateEmployeeMod
 import { NewServiceModal } from './components/modals/NewServiceModal';
 import { EditServiceModal } from './components/modals/EditServiceModal';
 import { DeleteServiceModal } from './components/modals/DeleteServiceModal';
+import { ServiceDetailsModal } from './components/modals/ServiceDetailsModal';
 import { NewPromoCodeModal } from './components/modals/NewPromoCodeModal';
 import { Employee, Service } from './types';
 
@@ -107,12 +109,14 @@ export default function App() {
   const [isNewPromoCodeModalOpen, setIsNewPromoCodeModalOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
+  const [serviceToView, setServiceToView] = useState<Service | null>(null);
   const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
   const [isAddShiftModalOpen, setIsAddShiftModalOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<any>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [services, setServices] = useState<Service[]>(() => servicesData.flatMap((c) => c.services));
 
   const loadCustomers = async (token: string) => {
     const response = await fetch('/api/customers', {
@@ -138,6 +142,18 @@ export default function App() {
     setEmployees(Array.isArray(data?.employees) ? data.employees : []);
   };
 
+  const loadServices = async (token: string) => {
+    const response = await fetch('/api/services', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tải danh sách dịch vụ.');
+    }
+    const data = await response.json();
+    setServices(Array.isArray(data?.services) ? data.services : []);
+  };
+
   useEffect(() => {
     const verifyAuth = async () => {
       if (!authToken) {
@@ -154,12 +170,14 @@ export default function App() {
         setIsLoggedIn(true);
         await loadCustomers(authToken);
         await loadEmployees(authToken);
+        await loadServices(authToken);
       } catch (_error) {
         localStorage.removeItem('auth_token');
         setAuthToken(null);
         setIsLoggedIn(false);
         setCustomers([]);
         setEmployees([]);
+        setServices(servicesData.flatMap((c) => c.services));
       } finally {
         setAuthChecking(false);
       }
@@ -184,6 +202,71 @@ export default function App() {
     setIsLoggedIn(false);
     setCustomers([]);
     setEmployees([]);
+    setServices(servicesData.flatMap((c) => c.services));
+  };
+
+  const handleCreateService = async (payload: Omit<Service, 'id'>) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch('/api/services', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tạo dịch vụ mới.');
+    }
+
+    await loadServices(authToken);
+  };
+
+  const handleUpdateService = async (updated: Service) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch(`/api/services/${updated.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(updated),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể cập nhật dịch vụ.');
+    }
+
+    await loadServices(authToken);
+  };
+
+  const handleDeleteService = async (id: string | number) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch(`/api/services/${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể xóa dịch vụ.');
+    }
+
+    await loadServices(authToken);
   };
 
   const navigateToTab = (tab: View) => {
@@ -558,9 +641,11 @@ export default function App() {
           ) : activeTab === 'services' ? (
             <ServicesView 
               key="services" 
+              services={services}
               onNewService={() => setIsNewServiceModalOpen(true)} 
               onEditService={(service) => setServiceToEdit(service)}
               onDeleteService={(service) => setServiceToDelete(service)}
+              onViewService={(service) => setServiceToView(service)}
             />
           ) : activeTab === 'reports' ? (
             <ReportsView key="reports" />
@@ -674,7 +759,10 @@ export default function App() {
       {/* New Service Modal */}
       <AnimatePresence>
         {isNewServiceModalOpen && (
-          <NewServiceModal onClose={() => setIsNewServiceModalOpen(false)} />
+          <NewServiceModal
+            onClose={() => setIsNewServiceModalOpen(false)}
+            onSave={handleCreateService}
+          />
         )}
       </AnimatePresence>
 
@@ -685,8 +773,15 @@ export default function App() {
             service={serviceToEdit}
             onClose={() => setServiceToEdit(null)}
             onConfirm={(updated) => {
-              console.log('Updating service:', updated.name);
-              setServiceToEdit(null);
+              (async () => {
+                try {
+                  await handleUpdateService(updated);
+                  setServiceToEdit(null);
+                } catch (e) {
+                  const message = e instanceof Error ? e.message : 'Không thể cập nhật dịch vụ.';
+                  alert(message);
+                }
+              })();
             }}
           />
         )}
@@ -699,9 +794,26 @@ export default function App() {
             service={serviceToDelete}
             onClose={() => setServiceToDelete(null)}
             onConfirm={() => {
-              console.log('Deleting service:', serviceToDelete.name);
-              setServiceToDelete(null);
+              (async () => {
+                try {
+                  await handleDeleteService(serviceToDelete.id);
+                  setServiceToDelete(null);
+                } catch (e) {
+                  const message = e instanceof Error ? e.message : 'Không thể xóa dịch vụ.';
+                  alert(message);
+                }
+              })();
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Service Details Modal */}
+      <AnimatePresence>
+        {serviceToView && (
+          <ServiceDetailsModal
+            service={serviceToView}
+            onClose={() => setServiceToView(null)}
           />
         )}
       </AnimatePresence>

@@ -67,10 +67,11 @@ export interface ServiceCategory {
 }
 
 export interface Service {
-  id: number;
+  id: string | number;
   name: string;
   duration: string;
   price: string;
+  maxPrice?: string;
   cost?: string;
   commissionRate?: number;
   description: string;

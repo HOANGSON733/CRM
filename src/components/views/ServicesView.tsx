@@ -15,26 +15,37 @@ import {
   Edit3,
   Trash2
 } from 'lucide-react';
-import { servicesData } from '../../data/mockData';
 import { cn } from '../../lib/utils';
 import { Service } from '../../types';
 
 interface ServicesViewProps {
+  services: Service[];
   onNewService: () => void;
   onEditService: (service: Service) => void;
   onDeleteService: (service: Service) => void;
+  onViewService: (service: Service) => void;
   key?: string;
 }
 
-export function ServicesView({ onNewService, onEditService, onDeleteService }: ServicesViewProps) {
+function getInitials(name: string) {
+  const cleaned = String(name || '').trim();
+  if (!cleaned) return 'S';
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length === 1) return words[0].slice(0, 1).toUpperCase();
+  return (words[0].slice(0, 1) + words[words.length - 1].slice(0, 1)).toUpperCase();
+}
+
+export function ServicesView({ services, onNewService, onEditService, onDeleteService, onViewService }: ServicesViewProps) {
   const [activeCategory, setActiveCategory] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState("");
+  const [failedImages, setFailedImages] = useState<Record<string, true>>({});
 
-  const categories = ["Tất cả", ...servicesData.map(c => c.name)];
-
-  const allServices = servicesData.flatMap(c => c.services);
+  const categories = [
+    "Tất cả",
+    ...Array.from(new Set(services.map((s) => s.category))).sort((a, b) => a.localeCompare(b, 'vi')),
+  ];
   
-  const filteredServices = allServices.filter(service => {
+  const filteredServices = services.filter(service => {
     const matchesCategory = activeCategory === "Tất cả" || service.category === activeCategory;
     const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -43,8 +54,8 @@ export function ServicesView({ onNewService, onEditService, onDeleteService }: S
   const getIcon = (categoryName: string) => {
     switch (categoryName) {
       case "Cắt & Tạo Kiểu": return <Scissors size={18} />;
-      case "Hóa Chất (Nhuộm/Uốn)": return <Droplets size={18} />;
-      case "Phục Hồi & Chăm Sóc": return <Sparkles size={18} />;
+      case "Hóa Chất": return <Droplets size={18} />;
+      case "Phục Hồi": return <Sparkles size={18} />;
       default: return <Tag size={18} />;
     }
   };
@@ -122,11 +133,20 @@ export function ServicesView({ onNewService, onEditService, onDeleteService }: S
               className="bg-white rounded-[2.5rem] shadow-sm border border-stone-100 overflow-hidden group flex flex-col"
             >
               <div className="relative h-56 overflow-hidden">
-                <img 
-                  src={service.image} 
-                  alt={service.name} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                />
+                {service.image && !failedImages[String(service.id)] ? (
+                  <img 
+                    src={service.image} 
+                    alt={service.name} 
+                    onError={() => setFailedImages((prev) => ({ ...prev, [String(service.id)]: true }))}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                  />
+                ) : (
+                  <div className="w-full h-full bg-stone-100 flex items-center justify-center">
+                    <div className="w-20 h-20 rounded-3xl bg-white flex items-center justify-center shadow-sm border border-stone-100">
+                      <span className="text-4xl font-serif text-primary">{getInitials(service.name)}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
                   <p className="text-white text-xs leading-relaxed line-clamp-2">
                     {service.description}
@@ -183,7 +203,10 @@ export function ServicesView({ onNewService, onEditService, onDeleteService }: S
                     ))}
                     <div className="w-8 h-8 rounded-full border-2 border-white bg-stone-50 flex items-center justify-center text-[8px] font-bold text-stone-400">+5</div>
                   </div>
-                  <button className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-2 group-hover:text-secondary transition-colors">
+                  <button
+                    onClick={() => onViewService(service)}
+                    className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-2 group-hover:text-secondary transition-colors"
+                  >
                     Chi tiết <ChevronRight size={14} />
                   </button>
                 </div>

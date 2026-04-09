@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Plus, Upload, Clock, ChevronDown, Check, Edit3 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -12,8 +12,16 @@ interface EditServiceModalProps {
 
 export function EditServiceModal({ service, onClose, onConfirm }: EditServiceModalProps) {
   const [isActive, setIsActive] = useState(true);
-  const [addons, setAddons] = useState(['Sấy kiểu']);
+  const [addons, setAddons] = useState<string[]>(() => {
+    const tags = Array.isArray(service.tags) ? service.tags : [];
+    const restored = tags
+      .map((t) => String(t || '').replace(/^#/, ''))
+      .filter(Boolean);
+    return restored.length ? restored : ['Sấy kiểu'];
+  });
   const availableAddons = ['Massage cổ vai gáy', 'Hấp tinh dầu'];
+  const [isAddingAddon, setIsAddingAddon] = useState(false);
+  const [newAddonName, setNewAddonName] = useState('');
 
   // Form states
   const [name, setName] = useState(service.name);
@@ -21,6 +29,8 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
   const [description, setDescription] = useState(service.description);
   const [duration, setDuration] = useState(service.duration.replace(' phút', ''));
   const [price, setPrice] = useState(service.price);
+  const [maxPrice, setMaxPrice] = useState(service.maxPrice || '');
+  const [image, setImage] = useState(service.image || '');
 
   const toggleAddon = (addon: string) => {
     if (addons.includes(addon)) {
@@ -28,6 +38,19 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
     } else {
       setAddons([...addons, addon]);
     }
+  };
+
+  const addNewAddon = () => {
+    const cleaned = newAddonName.trim().replace(/\s+/g, ' ');
+    if (!cleaned) return;
+    if (addons.some((a) => a.toLowerCase() === cleaned.toLowerCase())) {
+      setIsAddingAddon(false);
+      setNewAddonName('');
+      return;
+    }
+    setAddons((prev) => [...prev, cleaned]);
+    setIsAddingAddon(false);
+    setNewAddonName('');
   };
 
   const handleSave = () => {
@@ -38,6 +61,10 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
       description,
       duration: `${duration} phút`,
       price,
+      maxPrice,
+      image,
+      popularity: isActive ? 80 : 0,
+      tags: addons.map((a) => `#${a.replace(/\s+/g, '').toLowerCase()}`),
     });
   };
 
@@ -88,18 +115,36 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
             <p className="text-sm font-bold text-primary">{isActive ? 'Đang hoạt động' : 'Tạm ngưng'}</p>
           </div>
 
-          <div className="flex-1 relative group cursor-pointer">
-            <div className="absolute inset-0 bg-black/20 rounded-[2rem] flex flex-col items-center justify-center space-y-4 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px]">
+          <div className="flex-1 relative group">
+            <label className="absolute inset-0 bg-black/20 rounded-[2rem] flex flex-col items-center justify-center space-y-4 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-[2px] cursor-pointer">
               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary shadow-sm">
                 <Upload size={20} />
               </div>
               <p className="text-xs font-bold text-white uppercase tracking-widest">THAY ĐỔI ẢNH</p>
-            </div>
-            <img 
-              src={service.image} 
-              alt={service.name} 
-              className="w-full h-full object-cover rounded-[2rem]"
-            />
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setImage(String(reader.result || ''));
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            {image ? (
+              <img 
+                src={image} 
+                alt={service.name} 
+                className="w-full h-full object-cover rounded-[2rem]"
+              />
+            ) : (
+              <div className="w-full h-full rounded-[2rem] bg-stone-100 flex items-center justify-center">
+                <p className="text-5xl font-serif text-primary">{name.trim() ? name.trim().slice(0, 1).toUpperCase() : 'S'}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -182,7 +227,8 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
               <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">GIÁ TỐI ĐA</label>
               <input 
                 type="text" 
-                defaultValue="2.000.000"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
                 className="w-full border-b border-stone-100 py-3 text-sm font-bold text-primary focus:border-primary transition-all outline-none"
               />
             </div>
@@ -214,10 +260,53 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
                   {addon} <Check size={14} />
                 </button>
               ))}
-              <button className="text-[10px] font-bold text-stone-400 uppercase tracking-widest hover:text-primary transition-colors flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsAddingAddon((v) => !v)}
+                className="text-[10px] font-bold text-stone-400 uppercase tracking-widest hover:text-primary transition-colors flex items-center gap-1"
+              >
                 + THÊM MỚI
               </button>
             </div>
+
+            {isAddingAddon && (
+              <div className="flex gap-3 items-center">
+                <input
+                  type="text"
+                  value={newAddonName}
+                  onChange={(e) => setNewAddonName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addNewAddon();
+                    } else if (e.key === 'Escape') {
+                      setIsAddingAddon(false);
+                      setNewAddonName('');
+                    }
+                  }}
+                  placeholder="VD: Sấy kiểu"
+                  className="flex-1 bg-stone-50 border border-stone-100 rounded-xl py-3 px-4 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={addNewAddon}
+                  className="px-6 py-3 bg-primary text-white rounded-xl text-xs font-bold shadow-xl hover:bg-primary-light transition-all active:scale-95"
+                >
+                  Thêm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingAddon(false);
+                    setNewAddonName('');
+                  }}
+                  className="px-6 py-3 bg-stone-50 text-stone-400 rounded-xl text-xs font-bold hover:bg-stone-100 transition-all"
+                >
+                  Hủy
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-4 pt-8">

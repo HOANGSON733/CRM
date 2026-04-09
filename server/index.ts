@@ -6,6 +6,7 @@ import healthRouter from './routes/health.routes';
 import authRouter from './routes/auth.routes';
 import customersRouter from './routes/customers.routes';
 import employeesRouter from './routes/employees.routes';
+import servicesRouter from './routes/services.routes';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -15,6 +16,7 @@ app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/customers', customersRouter);
 app.use('/api/employees', employeesRouter);
+app.use('/api/services', servicesRouter);
 
 connectMongo()
   .then(() => {
