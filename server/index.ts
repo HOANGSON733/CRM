@@ -7,6 +7,9 @@ import authRouter from './routes/auth.routes';
 import customersRouter from './routes/customers.routes';
 import employeesRouter from './routes/employees.routes';
 import servicesRouter from './routes/services.routes';
+import productsRouter from './routes/products.routes';
+import serviceCategoriesRouter from './routes/serviceCategories.routes';
+import productCategoriesRouter from './routes/productCategories.routes';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -17,6 +20,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/customers', customersRouter);
 app.use('/api/employees', employeesRouter);
 app.use('/api/services', servicesRouter);
+app.use('/api/products', productsRouter);
+app.use('/api/service-categories', serviceCategoriesRouter);
+app.use('/api/product-categories', productCategoriesRouter);
 
 connectMongo()
   .then(() => {

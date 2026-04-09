@@ -73,6 +73,11 @@ export async function createService(req: Request, res: Response) {
       return res.status(400).json({ message: 'Vui lòng nhập tên, danh mục, thời lượng và giá.' });
     }
 
+    const categoryExists = await currentDb().collection('service_categories').findOne({ name: category });
+    if (!categoryExists) {
+      return res.status(400).json({ message: 'Danh mục dịch vụ không tồn tại trong Hệ thống.' });
+    }
+
     const now = new Date();
     const service = {
       name,
@@ -134,6 +139,11 @@ export async function updateService(req: Request, res: Response) {
 
     if (!name || !category || !duration || !price) {
       return res.status(400).json({ message: 'Vui lòng nhập tên, danh mục, thời lượng và giá.' });
+    }
+
+    const categoryExists = await currentDb().collection('service_categories').findOne({ name: category });
+    if (!categoryExists) {
+      return res.status(400).json({ message: 'Danh mục dịch vụ không tồn tại trong Hệ thống.' });
     }
 
     const current = await currentDb().collection('services').findOne({ _id: new ObjectId(serviceId) });

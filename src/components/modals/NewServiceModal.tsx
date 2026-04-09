@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Plus, Upload, Clock, ChevronDown, Check, Info } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Service } from '../../types';
+import { prepareImageFromFile } from '../../lib/imageUpload';
 
 interface NewServiceModalProps {
   onClose: () => void;
   onSave: (payload: Omit<Service, 'id'>) => void | Promise<void>;
+  categories?: string[];
 }
 
-export function NewServiceModal({ onClose, onSave }: NewServiceModalProps) {
+export function NewServiceModal({ onClose, onSave, categories = [] }: NewServiceModalProps) {
   const [isActive, setIsActive] = useState(true);
   const [addons, setAddons] = useState(['Sấy kiểu']);
   const availableAddons = ['Massage cổ vai gáy', 'Hấp tinh dầu'];
@@ -19,12 +21,22 @@ export function NewServiceModal({ onClose, onSave }: NewServiceModalProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Cắt & Tạo Kiểu');
+  const [category, setCategory] = useState(categories[0] || '');
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState('45');
   const [price, setPrice] = useState('1.200.000');
   const [maxPrice, setMaxPrice] = useState('2.000.000');
   const [image, setImage] = useState('');
+
+  useEffect(() => {
+    if (!categories.length) {
+      setCategory('');
+      return;
+    }
+    if (!categories.includes(category)) {
+      setCategory(categories[0]);
+    }
+  }, [categories, category]);
 
   const toggleAddon = (addon: string) => {
     if (addons.includes(addon)) {
@@ -49,7 +61,10 @@ export function NewServiceModal({ onClose, onSave }: NewServiceModalProps) {
 
   const handleSave = async () => {
     const trimmedName = name.trim();
-    if (!trimmedName) return;
+    if (!trimmedName || !category.trim()) {
+      setError('Vui lòng nhập tên dịch vụ và chọn danh mục.');
+      return;
+    }
 
     setIsSaving(true);
     setError(null);
@@ -93,9 +108,6 @@ export function NewServiceModal({ onClose, onSave }: NewServiceModalProps) {
         {/* Left Side - Info & Image */}
         <div className="w-[40%] p-12 flex flex-col space-y-8">
           <div className="space-y-6">
-            <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white">
-              <Plus size={24} />
-            </div>
             <h2 className="text-4xl font-serif text-primary leading-tight">Thêm dịch vụ mới</h2>
             <p className="text-stone-500 text-sm leading-relaxed">
               Vui lòng điền thông tin chi tiết để thiết lập dịch vụ mới trong danh mục thượng lưu của bạn.
@@ -134,17 +146,19 @@ export function NewServiceModal({ onClose, onSave }: NewServiceModalProps) {
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  if (file.size > 5 * 1024 * 1024) {
-                    setError('Ảnh tối đa 5MB.');
-                    return;
+                  try {
+                    const nextImage = await prepareImageFromFile(file);
+                    setImage(nextImage);
+                    setError(null);
+                  } catch (err) {
+                    const message = err instanceof Error ? err.message : 'Khong the tai anh.';
+                    setError(message);
+                  } finally {
+                    e.currentTarget.value = '';
                   }
-                  const reader = new FileReader();
-                  reader.onload = () => setImage(String(reader.result || ''));
-                  reader.onerror = () => setError('Không thể đọc file ảnh.');
-                  reader.readAsDataURL(file);
                 }}
               />
             </label>
@@ -195,13 +209,11 @@ export function NewServiceModal({ onClose, onSave }: NewServiceModalProps) {
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full border-b border-stone-100 py-3 text-sm font-bold text-primary focus:border-primary transition-all outline-none appearance-none cursor-pointer pr-8"
                 >
-                  <option>Cắt & Tạo Kiểu</option>
-                  <option>Hóa Chất</option>
-                  <option>Phục Hồi</option>
-                  <option>Dịch vụ Tóc</option>
-                  <option>Chăm sóc Da</option>
-                  <option>Nail & Spa</option>
-                  <option>Combo Đặc biệt</option>
+                  {categories.length ? (
+                    categories.map((item) => <option key={item}>{item}</option>)
+                  ) : (
+                    <option value="">Chưa có danh mục</option>
+                  )}
                 </select>
                 <ChevronDown size={16} className="absolute right-0 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
               </div>

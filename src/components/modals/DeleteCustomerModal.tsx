@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
-import { cn } from '../../lib/utils';
 
 interface DeleteCustomerModalProps {
   customer: any;
@@ -9,8 +8,6 @@ interface DeleteCustomerModalProps {
 }
 
 export function DeleteCustomerModal({ customer, onClose }: DeleteCustomerModalProps) {
-  const [confirmText, setConfirmText] = useState('');
-
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <motion.div 
@@ -49,16 +46,9 @@ export function DeleteCustomerModal({ customer, onClose }: DeleteCustomerModalPr
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">NHẬP "XÓA" ĐỂ XÁC NHẬN</label>
-            <input 
-              type="text" 
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              placeholder="X Ó A"
-              className="w-full bg-white border border-stone-200 rounded-xl py-4 text-center text-sm font-bold tracking-[0.5em] focus:ring-2 focus:ring-red-500/10 focus:border-red-500 transition-all uppercase"
-            />
-          </div>
+          <p className="text-xs text-stone-400">
+            Khách hàng: <span className="font-bold text-primary">{customer?.name || 'N/A'}</span>
+          </p>
         </div>
 
         <div className="flex border-t border-stone-100">
@@ -69,11 +59,8 @@ export function DeleteCustomerModal({ customer, onClose }: DeleteCustomerModalPr
             Hủy bỏ
           </button>
           <button 
-            disabled={confirmText.toUpperCase() !== 'XÓA'}
-            className={cn(
-              "flex-1 py-6 text-sm font-bold text-white flex items-center justify-center gap-2 transition-all",
-              confirmText.toUpperCase() === 'XÓA' ? "bg-red-600 hover:bg-red-700" : "bg-stone-200 cursor-not-allowed"
-            )}
+            onClick={onClose}
+            className="flex-1 py-6 text-sm font-bold text-white flex items-center justify-center gap-2 transition-all bg-red-600 hover:bg-red-700"
           >
             <Trash2 size={18} />
             Xác nhận xóa

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Calendar, Clock, ChevronDown, CheckCircle2, Image as ImageIcon, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { prepareImageFromFile } from '../../lib/imageUpload';
 
 interface NewEmployeeModalProps {
   onClose: () => void;
@@ -99,23 +100,19 @@ export function NewEmployeeModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setErrorMessage('Vui lòng chọn file ảnh hợp lệ.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMessage('Ảnh vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAvatar(String(reader.result || ''));
+    prepareImageFromFile(file)
+      .then((nextImage) => {
+      setAvatar(nextImage);
       setAvatarName(file.name);
       setErrorMessage('');
-    };
-    reader.onerror = () => setErrorMessage('Không thể đọc file ảnh. Vui lòng thử lại.');
-    reader.readAsDataURL(file);
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : 'Khong the tai anh.';
+        setErrorMessage(message);
+      })
+      .finally(() => {
+        e.currentTarget.value = '';
+      });
   };
 
   return (
@@ -147,7 +144,7 @@ export function NewEmployeeModal({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/webp"
               className="hidden"
               onChange={handleFileChange}
             />

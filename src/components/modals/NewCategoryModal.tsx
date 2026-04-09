@@ -19,7 +19,7 @@ import { cn } from '../../lib/utils';
 
 interface NewCategoryModalProps {
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: any) => void | Promise<void>;
 }
 
 const icons = [
@@ -54,9 +54,22 @@ export function NewCategoryModal({ onClose, onSave }: NewCategoryModalProps) {
   const [description, setDescription] = useState('');
   const [isVisible, setIsVisible] = useState(true);
 
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   const handleSave = () => {
-    onSave({ name, selectedIcon, selectedColor, description, isVisible });
-    onClose();
+    if (!name.trim()) {
+      setErrorMessage('Vui lòng nhập tên danh mục.');
+      return;
+    }
+    setIsSaving(true);
+    Promise.resolve(onSave({ name, selectedIcon, selectedColor, description, isVisible }))
+      .then(() => onClose())
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'Không thể lưu danh mục.';
+        setErrorMessage(message);
+      })
+      .finally(() => setIsSaving(false));
   };
 
   return (
@@ -197,11 +210,13 @@ export function NewCategoryModal({ onClose, onSave }: NewCategoryModalProps) {
             </button>
             <button 
               onClick={handleSave}
-              className="w-full py-5 bg-primary text-white rounded-2xl text-sm font-bold shadow-2xl hover:bg-primary-light transition-all uppercase tracking-widest active:scale-95"
+              disabled={isSaving}
+              className="w-full py-5 bg-primary text-white rounded-2xl text-sm font-bold shadow-2xl hover:bg-primary-light transition-all uppercase tracking-widest active:scale-95 disabled:opacity-60"
             >
-              Lưu danh mục
+              {isSaving ? 'Đang lưu...' : 'Lưu danh mục'}
             </button>
           </div>
+          {errorMessage && <p className="text-xs font-bold text-red-500">{errorMessage}</p>}
         </div>
       </motion.div>
     </div>

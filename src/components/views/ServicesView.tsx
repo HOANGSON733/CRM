@@ -20,6 +20,7 @@ import { Service } from '../../types';
 
 interface ServicesViewProps {
   services: Service[];
+  serviceCategories?: string[];
   onNewService: () => void;
   onEditService: (service: Service) => void;
   onDeleteService: (service: Service) => void;
@@ -35,14 +36,21 @@ function getInitials(name: string) {
   return (words[0].slice(0, 1) + words[words.length - 1].slice(0, 1)).toUpperCase();
 }
 
-export function ServicesView({ services, onNewService, onEditService, onDeleteService, onViewService }: ServicesViewProps) {
+export function ServicesView({
+  services,
+  serviceCategories = [],
+  onNewService,
+  onEditService,
+  onDeleteService,
+  onViewService,
+}: ServicesViewProps) {
   const [activeCategory, setActiveCategory] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState("");
   const [failedImages, setFailedImages] = useState<Record<string, true>>({});
 
   const categories = [
     "Tất cả",
-    ...Array.from(new Set(services.map((s) => s.category))).sort((a, b) => a.localeCompare(b, 'vi')),
+    ...Array.from(new Set([...serviceCategories, ...services.map((s) => s.category)])).sort((a, b) => a.localeCompare(b, 'vi')),
   ];
   
   const filteredServices = services.filter(service => {

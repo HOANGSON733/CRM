@@ -9,6 +9,7 @@ import {
   CalendarDays, 
   Users, 
   Scissors, 
+  Package,
   ClipboardList, 
   BarChart3, 
   Megaphone, 
@@ -46,11 +47,13 @@ import { AddShiftModal } from './components/modals/AddShiftModal';
 import { NewEmployeeModal } from './components/modals/NewEmployeeModal';
 import { TerminateEmployeeModal } from './components/modals/TerminateEmployeeModal';
 import { NewServiceModal } from './components/modals/NewServiceModal';
+import { NewProductModal } from './components/modals/NewProductModal';
+import { DeleteProductModal } from './components/modals/DeleteProductModal';
 import { EditServiceModal } from './components/modals/EditServiceModal';
 import { DeleteServiceModal } from './components/modals/DeleteServiceModal';
 import { ServiceDetailsModal } from './components/modals/ServiceDetailsModal';
 import { NewPromoCodeModal } from './components/modals/NewPromoCodeModal';
-import { Employee, Service } from './types';
+import { Employee, Product, ProductCategoryConfig, Service, ServiceCategoryConfig } from './types';
 
 const TAB_PATHS: Partial<Record<View, string>> = {
   dashboard: '/dashboard',
@@ -59,6 +62,7 @@ const TAB_PATHS: Partial<Record<View, string>> = {
   employees: '/employees',
   'employee-profile': '/employees/profile',
   services: '/services',
+  products: '/products',
   reports: '/reports',
   pos: '/pos',
   settings: '/settings',
@@ -81,6 +85,8 @@ function getTabFromPath(pathname: string): View {
       return 'employee-profile';
     case '/services':
       return 'services';
+    case '/products':
+      return 'products';
     case '/reports':
       return 'reports';
     case '/pos':
@@ -107,6 +113,7 @@ export default function App() {
   const [isNewEmployeeModalOpen, setIsNewEmployeeModalOpen] = useState(false);
   const [isEditEmployeeModalOpen, setIsEditEmployeeModalOpen] = useState(false);
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
+  const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
   const [isNewPromoCodeModalOpen, setIsNewPromoCodeModalOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
@@ -118,6 +125,14 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [services, setServices] = useState<Service[]>(() => servicesData.flatMap((c) => c.services));
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategoryConfig[]>([]);
+  const [productCategories, setProductCategories] = useState<ProductCategoryConfig[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [productsPage, setProductsPage] = useState(1);
+  const [productsTotalPages, setProductsTotalPages] = useState(1);
+  const [productsTotal, setProductsTotal] = useState(0);
 
   const loadCustomers = async (token: string) => {
     const response = await fetch('/api/customers', {
@@ -155,6 +170,45 @@ export default function App() {
     setServices(Array.isArray(data?.services) ? data.services : []);
   };
 
+  const loadServiceCategories = async (token: string) => {
+    const response = await fetch('/api/service-categories', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tải danh mục dịch vụ.');
+    }
+    const data = await response.json();
+    setServiceCategories(Array.isArray(data?.categories) ? data.categories : []);
+  };
+
+  const loadProducts = async (token: string, page = 1) => {
+    const response = await fetch(`/api/products?page=${page}&pageSize=12`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tải danh sách sản phẩm.');
+    }
+    const data = await response.json();
+    setProducts(Array.isArray(data?.products) ? data.products : []);
+    setProductsPage(Number(data?.pagination?.page || page));
+    setProductsTotalPages(Number(data?.pagination?.totalPages || 1));
+    setProductsTotal(Number(data?.pagination?.total || 0));
+  };
+
+  const loadProductCategories = async (token: string) => {
+    const response = await fetch('/api/product-categories', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tải danh mục sản phẩm.');
+    }
+    const data = await response.json();
+    setProductCategories(Array.isArray(data?.categories) ? data.categories : []);
+  };
+
   useEffect(() => {
     const verifyAuth = async () => {
       if (!authToken) {
@@ -172,6 +226,9 @@ export default function App() {
         await loadCustomers(authToken);
         await loadEmployees(authToken);
         await loadServices(authToken);
+        await loadServiceCategories(authToken);
+        await loadProductCategories(authToken);
+        await loadProducts(authToken, productsPage);
       } catch (_error) {
         localStorage.removeItem('auth_token');
         setAuthToken(null);
@@ -179,6 +236,12 @@ export default function App() {
         setCustomers([]);
         setEmployees([]);
         setServices(servicesData.flatMap((c) => c.services));
+        setServiceCategories([]);
+        setProductCategories([]);
+        setProducts([]);
+        setProductsPage(1);
+        setProductsTotalPages(1);
+        setProductsTotal(0);
       } finally {
         setAuthChecking(false);
       }
@@ -186,6 +249,11 @@ export default function App() {
 
     verifyAuth();
   }, [authToken]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !authToken || activeTab !== 'products') return;
+    loadProducts(authToken, productsPage).catch(() => undefined);
+  }, [productsPage, isLoggedIn, authToken, activeTab]);
 
   const handleLogin = (token: string) => {
     localStorage.setItem('auth_token', token);
@@ -204,6 +272,12 @@ export default function App() {
     setCustomers([]);
     setEmployees([]);
     setServices(servicesData.flatMap((c) => c.services));
+    setServiceCategories([]);
+    setProductCategories([]);
+    setProducts([]);
+    setProductsPage(1);
+    setProductsTotalPages(1);
+    setProductsTotal(0);
   };
 
   const handleCreateService = async (payload: Omit<Service, 'id'>) => {
@@ -226,6 +300,151 @@ export default function App() {
     }
 
     await loadServices(authToken);
+  };
+
+  const handleCreateServiceCategory = async (payload: {
+    name: string;
+    selectedIcon: string;
+    selectedColor: string;
+    description: string;
+    isVisible: boolean;
+  }) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch('/api/service-categories', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tạo danh mục dịch vụ.');
+    }
+
+    await loadServiceCategories(authToken);
+  };
+
+  const handleCreateProductCategory = async (payload: {
+    name: string;
+    selectedIcon: string;
+    selectedColor: string;
+    description: string;
+    isVisible: boolean;
+  }) => {
+    if (!authToken) throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    const response = await fetch('/api/product-categories', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tạo danh mục sản phẩm.');
+    }
+    await loadProductCategories(authToken);
+  };
+
+  const handleUpdateServiceCategory = async (
+    id: string | number,
+    payload: {
+      name: string;
+      selectedIcon: string;
+      selectedColor: string;
+      description: string;
+      isVisible: boolean;
+    }
+  ) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+    const response = await fetch(`/api/service-categories/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể cập nhật danh mục dịch vụ.');
+    }
+    await loadServiceCategories(authToken);
+    await loadServices(authToken);
+  };
+
+  const handleDeleteServiceCategory = async (id: string | number, replacementCategoryName?: string) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+    const response = await fetch(`/api/service-categories/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ replacementCategoryName }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể xóa danh mục dịch vụ.');
+    }
+    await loadServiceCategories(authToken);
+    await loadServices(authToken);
+  };
+
+  const handleUpdateProductCategory = async (
+    id: string | number,
+    payload: {
+      name: string;
+      selectedIcon: string;
+      selectedColor: string;
+      description: string;
+      isVisible: boolean;
+    }
+  ) => {
+    if (!authToken) throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    const response = await fetch(`/api/product-categories/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể cập nhật danh mục sản phẩm.');
+    }
+    await loadProductCategories(authToken);
+    await loadProducts(authToken, productsPage);
+  };
+
+  const handleDeleteProductCategory = async (id: string | number, replacementCategoryName?: string) => {
+    if (!authToken) throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    const response = await fetch(`/api/product-categories/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ replacementCategoryName }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể xóa danh mục sản phẩm.');
+    }
+    await loadProductCategories(authToken);
+    await loadProducts(authToken, productsPage);
   };
 
   const handleUpdateService = async (updated: Service) => {
@@ -268,6 +487,82 @@ export default function App() {
     }
 
     await loadServices(authToken);
+  };
+
+  const handleCreateProduct = async (payload: Omit<Product, 'id'>) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    const response = await fetch('/api/products', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể tạo sản phẩm mới.');
+    }
+
+    await loadProducts(authToken, 1);
+    setProductsPage(1);
+  };
+
+  const handleUpdateProduct = async (id: string | number, payload: Omit<Product, 'id'>) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+    const response = await fetch(`/api/products/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể cập nhật sản phẩm.');
+    }
+    await loadProducts(authToken, productsPage);
+  };
+
+  const handleDeleteProduct = async (id: string | number) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+    const response = await fetch(`/api/products/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể xóa sản phẩm.');
+    }
+    await loadProducts(authToken, productsPage);
+  };
+
+  const handleRestockProduct = async (id: string | number, amount: number) => {
+    if (!authToken) {
+      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+    const response = await fetch(`/api/products/${id}/restock`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ amount }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Không thể nhập kho sản phẩm.');
+    }
+    await loadProducts(authToken, productsPage);
   };
 
   const navigateToTab = (tab: View) => {
@@ -529,6 +824,12 @@ export default function App() {
             active={activeTab === 'services'}
             onClick={() => navigateToTab('services')}
           />
+          <SidebarItem
+            icon={<Package size={20} />}
+            label="Sản phẩm"
+            active={activeTab === 'products'}
+            onClick={() => navigateToTab('products')}
+          />
           <SidebarItem 
             icon={<BarChart3 size={20} />} 
             label="Báo cáo" 
@@ -643,17 +944,58 @@ export default function App() {
             <ServicesView 
               key="services" 
               services={services}
+              serviceCategories={serviceCategories.map((c) => c.name)}
               onNewService={() => setIsNewServiceModalOpen(true)} 
               onEditService={(service) => setServiceToEdit(service)}
               onDeleteService={(service) => setServiceToDelete(service)}
               onViewService={(service) => setServiceToView(service)}
+            />
+          ) : activeTab === 'products' ? (
+            <ProductsView
+              key="products"
+              products={products}
+              onNewProduct={() => setIsNewProductModalOpen(true)}
+              onEditProduct={(product) => setProductToEdit(product)}
+              onDeleteProduct={(product) => setProductToDelete(product)}
+              onRestockProduct={(product) => {
+                const value = window.prompt(`Nhập số lượng cần nhập kho cho "${product.name}"`, '1');
+                if (!value) return;
+                const amount = Number(value);
+                if (!Number.isFinite(amount) || amount <= 0) {
+                  alert('Số lượng nhập kho phải lớn hơn 0.');
+                  return;
+                }
+                (async () => {
+                  try {
+                    await handleRestockProduct(product.id, amount);
+                  } catch (e) {
+                    const message = e instanceof Error ? e.message : 'Không thể nhập kho sản phẩm.';
+                    alert(message);
+                  }
+                })();
+              }}
+              page={productsPage}
+              totalPages={productsTotalPages}
+              total={productsTotal}
+              onPageChange={(nextPage) => setProductsPage(nextPage)}
             />
           ) : activeTab === 'reports' ? (
             <ReportsView key="reports" />
           ) : activeTab === 'pos' ? (
             <POSView key="pos" />
           ) : activeTab === 'settings' ? (
-            <SettingsView key="settings" />
+            <SettingsView
+              services={services}
+              products={products}
+              serviceCategories={serviceCategories}
+              productCategories={productCategories}
+              onCreateCategory={handleCreateServiceCategory}
+              onUpdateCategory={handleUpdateServiceCategory}
+              onDeleteCategory={handleDeleteServiceCategory}
+              onCreateProductCategory={handleCreateProductCategory}
+              onUpdateProductCategory={handleUpdateProductCategory}
+              onDeleteProductCategory={handleDeleteProductCategory}
+            />
           ) : activeTab === 'marketing' ? (
             <MarketingView 
               key="marketing" 
@@ -763,6 +1105,53 @@ export default function App() {
           <NewServiceModal
             onClose={() => setIsNewServiceModalOpen(false)}
             onSave={handleCreateService}
+            categories={serviceCategories.map((c) => c.name)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* New Product Modal */}
+      <AnimatePresence>
+        {isNewProductModalOpen && (
+          <NewProductModal
+            onClose={() => setIsNewProductModalOpen(false)}
+            onSave={handleCreateProduct}
+            categories={productCategories.map((c) => c.name)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Edit Product Modal */}
+      <AnimatePresence>
+        {productToEdit && (
+          <NewProductModal
+            onClose={() => setProductToEdit(null)}
+            onSave={(payload) => handleUpdateProduct(productToEdit.id, payload)}
+            categories={productCategories.map((c) => c.name)}
+            initialData={productToEdit}
+            title="Cập Nhật Sản Phẩm"
+            saveLabel="CẬP NHẬT SẢN PHẨM"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Delete Product Modal */}
+      <AnimatePresence>
+        {productToDelete && (
+          <DeleteProductModal
+            product={productToDelete}
+            onClose={() => setProductToDelete(null)}
+            onConfirm={() => {
+              (async () => {
+                try {
+                  await handleDeleteProduct(productToDelete.id);
+                  setProductToDelete(null);
+                } catch (e) {
+                  const message = e instanceof Error ? e.message : 'Không thể xóa sản phẩm.';
+                  alert(message);
+                }
+              })();
+            }}
           />
         )}
       </AnimatePresence>
@@ -773,6 +1162,7 @@ export default function App() {
           <EditServiceModal 
             service={serviceToEdit}
             onClose={() => setServiceToEdit(null)}
+            categories={serviceCategories.map((c) => c.name)}
             onConfirm={(updated) => {
               (async () => {
                 try {

@@ -27,18 +27,53 @@ import {
   BarChart3
 } from 'lucide-react';
 import { NewCategoryModal } from '../modals/NewCategoryModal';
+import { EditServiceCategoryModal } from '../modals/EditServiceCategoryModal';
+import { DeleteServiceCategoryModal } from '../modals/DeleteServiceCategoryModal';
 import { cn } from '../../lib/utils';
+import { Product, ProductCategoryConfig, Service, ServiceCategoryConfig } from '../../types';
 
-const categories = [
-  { id: 1, name: 'Cắt & Tạo kiểu', count: 12, status: 'Đang hiện', icon: <Scissors size={20} />, color: 'bg-red-50 text-red-500' },
-  { id: 2, name: 'Nhuộm màu kỹ thuật', count: 8, status: 'Đang hiện', icon: <Palette size={20} />, color: 'bg-amber-50 text-amber-500' },
-  { id: 3, name: 'Chăm sóc & Phục hồi', count: 15, status: 'Đang ẩn', icon: <Sparkles size={20} />, color: 'bg-stone-100 text-stone-500' },
-];
-
-const detailedCategories = [
-  { id: 4, name: 'Trang điểm & Makeup', count: 5, status: 'Hiện', icon: <Smile size={18} /> },
-  { id: 5, name: 'Gội đầu dưỡng sinh', count: 4, status: 'Hiện', icon: <Coffee size={18} /> },
-];
+interface SettingsViewProps {
+  services?: Service[];
+  serviceCategories?: ServiceCategoryConfig[];
+  onCreateCategory?: (payload: {
+    name: string;
+    selectedIcon: string;
+    selectedColor: string;
+    description: string;
+    isVisible: boolean;
+  }) => void | Promise<void>;
+  onUpdateCategory?: (
+    id: string | number,
+    payload: {
+      name: string;
+      selectedIcon: string;
+      selectedColor: string;
+      description: string;
+      isVisible: boolean;
+    }
+  ) => void | Promise<void>;
+  onDeleteCategory?: (id: string | number, replacementCategoryName?: string) => void | Promise<void>;
+  products?: Product[];
+  productCategories?: ProductCategoryConfig[];
+  onCreateProductCategory?: (payload: {
+    name: string;
+    selectedIcon: string;
+    selectedColor: string;
+    description: string;
+    isVisible: boolean;
+  }) => void | Promise<void>;
+  onUpdateProductCategory?: (
+    id: string | number,
+    payload: {
+      name: string;
+      selectedIcon: string;
+      selectedColor: string;
+      description: string;
+      isVisible: boolean;
+    }
+  ) => void | Promise<void>;
+  onDeleteProductCategory?: (id: string | number, replacementCategoryName?: string) => void | Promise<void>;
+}
 
 const roles = [
   { 
@@ -67,19 +102,91 @@ const roles = [
   },
 ];
 
-const products = [
-  { id: 1, name: 'Serum Phục Hồi Keratin', brand: "L'Atelier Professional", price: '450.000đ', stock: 24, image: 'https://images.unsplash.com/photo-1526947425960-945c6e72858f?auto=format&fit=crop&q=80&w=200' },
-  { id: 2, name: 'Gội Xả Thảo Mộc', brand: 'Botanical Care', price: '320.000đ', stock: 5, image: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?auto=format&fit=crop&q=80&w=200' },
-];
-
-export function SettingsView() {
+export function SettingsView({
+  services = [],
+  products = [],
+  serviceCategories = [],
+  onCreateCategory,
+  onUpdateCategory,
+  onDeleteCategory,
+  productCategories = [],
+  onCreateProductCategory,
+  onUpdateProductCategory,
+  onDeleteProductCategory,
+}: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState('Danh mục dịch vụ');
   const [activeSubTab, setActiveSubTab] = useState('Cấp bậc nhân viên');
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<ServiceCategoryConfig | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<ServiceCategoryConfig | null>(null);
+  const [isNewProductCategoryModalOpen, setIsNewProductCategoryModalOpen] = useState(false);
+  const [productCategoryToEdit, setProductCategoryToEdit] = useState<ProductCategoryConfig | null>(null);
+  const [productCategoryToDelete, setProductCategoryToDelete] = useState<ProductCategoryConfig | null>(null);
+
+  const serviceCountByCategory = services.reduce<Record<string, number>>((acc, service) => {
+    const key = String(service.category || '').trim();
+    if (!key) return acc;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const categories = serviceCategories
+    .map((category) => ({
+      id: category.id,
+      name: category.name,
+      count: serviceCountByCategory[category.name] || 0,
+      status: category.isVisible === false ? 'Đang ẩn' : 'Đang hiện',
+      color: category.color,
+      icon: category.icon,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  const productCountByCategory = products.reduce<Record<string, number>>((acc, p) => {
+    const key = String(p.category || '').trim();
+    if (!key) return acc;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const productCategoriesView = productCategories
+    .map((category) => ({
+      id: category.id,
+      name: category.name,
+      count: productCountByCategory[category.name] || 0,
+      status: category.isVisible === false ? 'Đang ẩn' : 'Đang hiện',
+      color: category.color,
+      icon: category.icon,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+
+  const getCategoryMeta = (categoryName: string, color?: string, iconName?: string) => {
+    if (color && iconName) {
+      const iconNode =
+        iconName === 'palette' ? <Palette size={20} /> :
+        iconName === 'sparkles' ? <Sparkles size={20} /> :
+        iconName === 'coffee' ? <Coffee size={20} /> :
+        iconName === 'smile' ? <Smile size={20} /> :
+        iconName === 'droplets' ? <Palette size={20} /> :
+        <Scissors size={20} />;
+      return { icon: iconNode, colorClass: '', inlineStyle: { backgroundColor: `${color}20`, color } as React.CSSProperties };
+    }
+    const name = categoryName.toLowerCase();
+    if (name.includes('cắt') || name.includes('tạo kiểu')) {
+      return { icon: <Scissors size={20} />, colorClass: 'bg-red-50 text-red-500', inlineStyle: undefined };
+    }
+    if (name.includes('nhuộm') || name.includes('màu') || name.includes('hóa')) {
+      return { icon: <Palette size={20} />, colorClass: 'bg-amber-50 text-amber-500', inlineStyle: undefined };
+    }
+    if (name.includes('phục hồi') || name.includes('chăm sóc')) {
+      return { icon: <Sparkles size={20} />, colorClass: 'bg-stone-100 text-stone-500', inlineStyle: undefined };
+    }
+    if (name.includes('gội')) {
+      return { icon: <Coffee size={20} />, colorClass: 'bg-stone-100 text-stone-500', inlineStyle: undefined };
+    }
+    return { icon: <Smile size={20} />, colorClass: 'bg-stone-100 text-stone-500', inlineStyle: undefined };
+  };
 
   const tabs = [
     'Danh mục dịch vụ', 'Cấp bậc nhân viên', 'Thợ mặc định', 
-    'Nguồn khách', 'Lý do hủy', 'Sản phẩm bán lẻ', 'Thời lượng'
+    'Nguồn khách', 'Lý do hủy', 'Danh mục sản phẩm', 'Thời lượng'
   ];
 
   const staffLevels = [
@@ -268,14 +375,6 @@ export function SettingsView() {
               className="bg-stone-100 border-none rounded-2xl py-3 pl-12 pr-4 text-sm w-64 focus:ring-2 focus:ring-primary/10 transition-all outline-none"
             />
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center text-stone-400">
-              <Users size={20} />
-            </div>
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm">
-              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100" alt="User" />
-            </div>
-          </div>
         </div>
       </div>
 
@@ -313,16 +412,28 @@ export function SettingsView() {
             </button>
           </div>
 
+          {!categories.length && (
+            <div className="bg-white border border-stone-100 rounded-[2rem] p-10 text-center">
+              <p className="text-primary font-bold">Chưa có danh mục dịch vụ.</p>
+              <p className="text-stone-400 text-sm mt-2">
+                Thêm dịch vụ trong mục Dịch vụ &amp; Bảng giá để danh mục được đồng bộ tại đây.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {categories.map((cat) => (
               <div key={cat.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-stone-100 space-y-6 relative group">
                 <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-2 text-stone-400 hover:text-primary transition-colors"><Edit2 size={14} /></button>
-                  <button className="p-2 text-stone-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                  <button onClick={() => setCategoryToEdit(cat as unknown as ServiceCategoryConfig)} className="p-2 text-stone-400 hover:text-primary transition-colors"><Edit2 size={14} /></button>
+                  <button onClick={() => setCategoryToDelete(cat as unknown as ServiceCategoryConfig)} className="p-2 text-stone-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                   <button className="p-2 text-stone-300 cursor-grab"><GripVertical size={14} /></button>
                 </div>
-                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", cat.color)}>
-                  {cat.icon}
+                <div
+                  className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", getCategoryMeta(cat.name, cat.color, cat.icon).colorClass)}
+                  style={getCategoryMeta(cat.name, cat.color, cat.icon).inlineStyle}
+                >
+                  {getCategoryMeta(cat.name, cat.color, cat.icon).icon}
                 </div>
                 <div className="space-y-1">
                   <h4 className="text-lg font-bold text-primary">{cat.name}</h4>
@@ -354,18 +465,21 @@ export function SettingsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-50">
-                {detailedCategories.map((item) => (
+                {categories.map((item) => (
                   <tr key={item.id} className="hover:bg-stone-50/30 transition-colors">
                     <td className="px-10 py-6">
-                      <div className="w-10 h-10 bg-red-50 text-red-400 rounded-xl flex items-center justify-center">
-                        {item.icon}
+                      <div
+                        className={cn("w-10 h-10 rounded-xl flex items-center justify-center", getCategoryMeta(item.name, item.color, item.icon).colorClass)}
+                        style={getCategoryMeta(item.name, item.color, item.icon).inlineStyle}
+                      >
+                        {getCategoryMeta(item.name, item.color, item.icon).icon}
                       </div>
                     </td>
                     <td className="px-10 py-6 text-sm font-bold text-primary">{item.name}</td>
                     <td className="px-10 py-6 text-sm font-bold text-stone-600 text-center">{item.count}</td>
                     <td className="px-10 py-6 text-center">
                       <span className="bg-amber-50 text-amber-600 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                        {item.status}
+                        {item.status === 'Đang hiện' ? 'Hiện' : 'Ẩn'}
                       </span>
                     </td>
                     <td className="px-10 py-6 text-right">
@@ -451,38 +565,42 @@ export function SettingsView() {
       )}
 
       {/* Retail Products Tab */}
-      {activeTab === 'Sản phẩm bán lẻ' && (
+      {activeTab === 'Danh mục sản phẩm' && (
         <div className="space-y-8">
           <div className="flex justify-between items-end">
             <div className="space-y-1">
-              <h3 className="text-2xl font-serif text-primary">Sản phẩm bán lẻ</h3>
-              <p className="text-stone-400 text-sm">Quản lý danh mục sản phẩm chăm sóc tóc bán tại Salon</p>
+              <h3 className="text-2xl font-serif text-primary">Danh mục sản phẩm</h3>
+              <p className="text-stone-400 text-sm">Quản lý danh mục cha cho sản phẩm</p>
             </div>
-            <button className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xl hover:bg-primary-light transition-all">
-              <Plus size={16} /> Thêm sản phẩm
+            <button
+              onClick={() => setIsNewProductCategoryModalOpen(true)}
+              className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xl hover:bg-primary-light transition-all"
+            >
+              <Plus size={16} /> Thêm danh mục sản phẩm
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products.map((product) => (
-              <div key={product.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-stone-100 space-y-6 group">
-                <div className="aspect-square rounded-3xl overflow-hidden relative">
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold text-primary shadow-sm">
-                    {product.stock} CÒN LẠI
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {productCategoriesView.map((cat) => (
+              <div key={String(cat.id)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-stone-100 space-y-6 relative group">
+                <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => setProductCategoryToEdit(cat as ProductCategoryConfig)} className="p-2 text-stone-400 hover:text-primary transition-colors"><Edit2 size={14} /></button>
+                  <button onClick={() => setProductCategoryToDelete(cat as ProductCategoryConfig)} className="p-2 text-stone-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                  <button className="p-2 text-stone-300 cursor-grab"><GripVertical size={14} /></button>
                 </div>
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">{product.brand}</p>
-                    <h4 className="text-lg font-serif text-primary leading-tight">{product.name}</h4>
-                  </div>
-                  <div className="flex justify-between items-end">
-                    <p className="text-xl font-serif text-primary">{product.price}</p>
-                    <div className="flex gap-2">
-                      <button className="p-2 text-stone-300 hover:text-primary transition-colors"><Edit2 size={16} /></button>
-                      <button className="p-2 text-stone-300 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
-                    </div>
+                <div
+                  className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", getCategoryMeta(cat.name, cat.color, cat.icon).colorClass)}
+                  style={getCategoryMeta(cat.name, cat.color, cat.icon).inlineStyle}
+                >
+                  {getCategoryMeta(cat.name, cat.color, cat.icon).icon}
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-lg font-bold text-primary">{cat.name}</h4>
+                  <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
+                    <span className="text-stone-400">{cat.count} sản phẩm</span>
+                    <span className={cn(cat.status === 'Đang hiện' ? "text-green-500" : "text-stone-300")}>
+                      {cat.status === 'Đang hiện' ? '● Đang hiện' : '○ Đang ẩn'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -646,10 +764,63 @@ export function SettingsView() {
         {isNewCategoryModalOpen && (
           <NewCategoryModal 
             onClose={() => setIsNewCategoryModalOpen(false)}
-            onSave={(data) => {
-              console.log('Saving new category:', data);
-              setIsNewCategoryModalOpen(false);
-            }}
+            onSave={(data) => onCreateCategory?.(data)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isNewProductCategoryModalOpen && (
+          <NewCategoryModal
+            onClose={() => setIsNewProductCategoryModalOpen(false)}
+            onSave={(data) => onCreateProductCategory?.(data)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {categoryToEdit && (
+          <EditServiceCategoryModal
+            category={categoryToEdit}
+            onClose={() => setCategoryToEdit(null)}
+            onSave={(payload) => onUpdateCategory?.(categoryToEdit.id, payload)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {categoryToDelete && (
+          <DeleteServiceCategoryModal
+            category={categoryToDelete}
+            serviceCount={serviceCountByCategory[categoryToDelete.name] || 0}
+            allCategories={serviceCategories}
+            onClose={() => setCategoryToDelete(null)}
+            onConfirm={(replacementCategoryName) => onDeleteCategory?.(categoryToDelete.id, replacementCategoryName)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {productCategoryToEdit && (
+          <EditServiceCategoryModal
+            category={productCategoryToEdit}
+            onClose={() => setProductCategoryToEdit(null)}
+            onSave={(payload) => onUpdateProductCategory?.(productCategoryToEdit.id, payload)}
+            title="Sửa danh mục sản phẩm"
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {productCategoryToDelete && (
+          <DeleteServiceCategoryModal
+            category={productCategoryToDelete}
+            serviceCount={productCountByCategory[productCategoryToDelete.name] || 0}
+            allCategories={productCategories}
+            onClose={() => setProductCategoryToDelete(null)}
+            onConfirm={(replacementCategoryName) => onDeleteProductCategory?.(productCategoryToDelete.id, replacementCategoryName)}
+            title="Xác nhận xóa danh mục sản phẩm"
+            unitLabel="sản phẩm"
           />
         )}
       </AnimatePresence>

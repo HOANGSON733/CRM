@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -6,21 +6,56 @@ import {
   RefreshCw, 
   Save, 
   CheckCircle2,
-  ChevronDown,
-  Image as ImageIcon,
-  Plus
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Product } from '../../types';
+import { prepareImageFromFile } from '../../lib/imageUpload';
 
 interface NewProductModalProps {
   onClose: () => void;
+  onSave: (payload: Omit<Product, 'id'>) => void | Promise<void>;
+  categories?: string[];
+  initialData?: Partial<Product>;
+  title?: string;
+  saveLabel?: string;
 }
 
-export function NewProductModal({ onClose }: NewProductModalProps) {
-  const [sku, setSku] = useState('ORB-GL-01');
-  const [costPrice, setCostPrice] = useState('450.000');
-  const [sellingPrice, setSellingPrice] = useState('620.000');
+function formatNumberInput(value: string) {
+  const raw = value.replace(/[^\d]/g, '');
+  if (!raw) return '';
+  return Number(raw).toLocaleString('vi-VN');
+}
+
+function parseNumber(value: string) {
+  return Number(value.replace(/[^\d]/g, '') || 0);
+}
+
+export function NewProductModal({ onClose, onSave, categories = [], initialData, title, saveLabel }: NewProductModalProps) {
+  const [name, setName] = useState(initialData?.name || '');
+  const [brand, setBrand] = useState(initialData?.brand || '');
+  const [category, setCategory] = useState(initialData?.category || categories[0] || '');
+  const [sku, setSku] = useState(initialData?.sku || 'PROD-000001');
+  const [volume, setVolume] = useState(initialData?.volume || '');
+  const [description, setDescription] = useState(initialData?.description || '');
+  const [stock, setStock] = useState(formatNumberInput(String(initialData?.stock ?? 0)));
+  const [maxStock, setMaxStock] = useState(formatNumberInput(String(initialData?.maxStock ?? 20)));
+  const [image, setImage] = useState(initialData?.image || '');
+  const [costPrice, setCostPrice] = useState(initialData?.costPrice || '450.000');
+  const [sellingPrice, setSellingPrice] = useState(initialData?.sellingPrice || '620.000');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!categories.length) {
+      setCategory('');
+      return;
+    }
+    if (!categories.includes(category)) {
+      setCategory(categories[0]);
+    }
+  }, [categories, category]);
 
   const generateSku = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -32,8 +67,8 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
   };
 
   const calculateProfit = () => {
-    const cost = parseInt(costPrice.replace(/\./g, '')) || 0;
-    const sell = parseInt(sellingPrice.replace(/\./g, '')) || 0;
+    const cost = parseNumber(costPrice);
+    const sell = parseNumber(sellingPrice);
     const profit = sell - cost;
     const margin = sell > 0 ? (profit / sell) * 100 : 0;
     return { profit, margin };
@@ -41,12 +76,46 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
 
   const { profit, margin } = calculateProfit();
 
-  const handleSave = () => {
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      onClose();
-    }, 2000);
+  const handleSave = async () => {
+    if (!name.trim() || !brand.trim() || !category.trim()) {
+      setError('Vui lòng nhập tên sản phẩm, thương hiệu và chọn danh mục.');
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      const stockValue = parseNumber(stock);
+      const maxStockValue = parseNumber(maxStock) || 1;
+      const status: Product['status'] =
+        stockValue <= 0 ? 'out-of-stock' : stockValue <= 5 ? 'low-stock' : 'in-stock';
+
+      await onSave({
+        name: name.trim(),
+        brand: brand.trim(),
+        category: category.trim(),
+        sku: sku.trim(),
+        volume: volume.trim(),
+        description: description.trim() || '—',
+        sellingPrice: formatNumberInput(sellingPrice) || '0',
+        costPrice: formatNumberInput(costPrice) || '0',
+        stock: stockValue,
+        maxStock: maxStockValue,
+        image: image.trim(),
+        status,
+      });
+
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        onClose();
+      }, 1200);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Không thể lưu sản phẩm.';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -68,7 +137,7 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
         {/* Header */}
         <div className="p-10 border-b border-stone-100 flex justify-between items-start bg-stone-50/30">
           <div className="space-y-2">
-            <h2 className="text-4xl font-serif text-primary">Thêm Sản Phẩm Mới</h2>
+            <h2 className="text-4xl font-serif text-primary">{title || 'Thêm Sản Phẩm Mới'}</h2>
             <p className="text-stone-500 text-sm">Cập nhật danh mục hàng hóa vào hệ thống Bella Hair Salon</p>
           </div>
           <button 
@@ -90,6 +159,8 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
                 <input 
                   type="text" 
                   placeholder="Vd: Tinh dầu dưỡng tóc Oribe Gold Lust"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   className="w-full bg-stone-50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 ring-primary/10 outline-none transition-all"
                 />
               </div>
@@ -101,6 +172,8 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
                   <input 
                     type="text" 
                     placeholder="Oribe, Kerastase..."
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
                     className="w-full bg-stone-50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 ring-primary/10 outline-none transition-all"
                   />
                 </div>
@@ -108,10 +181,16 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">DANH MỤC</label>
                   <div className="relative">
-                    <select className="w-full bg-stone-50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 ring-primary/10 outline-none transition-all appearance-none cursor-pointer">
-                      <option>Dưỡng tóc & Phục hồi</option>
-                      <option>Dầu gội & Dầu xả</option>
-                      <option>Tạo kiểu</option>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full bg-stone-50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 ring-primary/10 outline-none transition-all appearance-none cursor-pointer"
+                    >
+                      {categories.length ? (
+                        categories.map((item) => <option key={item}>{item}</option>)
+                      ) : (
+                        <option value="">Chưa có danh mục</option>
+                      )}
                     </select>
                     <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
                   </div>
@@ -143,6 +222,8 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
                   <input 
                     type="text" 
                     placeholder="Vd: 100ml, 500g"
+                    value={volume}
+                    onChange={(e) => setVolume(e.target.value)}
                     className="w-full bg-stone-50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 ring-primary/10 outline-none transition-all"
                   />
                 </div>
@@ -154,8 +235,31 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
                 <textarea 
                   rows={4}
                   placeholder="Nhập tóm tắt công dụng và thành phần chính..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   className="w-full bg-stone-50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 ring-primary/10 outline-none transition-all resize-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỒN KHO</label>
+                  <input
+                    type="text"
+                    value={stock}
+                    onChange={(e) => setStock(formatNumberInput(e.target.value))}
+                    className="w-full bg-stone-50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 ring-primary/10 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">MỨC TỒN TỐI ĐA</label>
+                  <input
+                    type="text"
+                    value={maxStock}
+                    onChange={(e) => setMaxStock(formatNumberInput(e.target.value))}
+                    className="w-full bg-stone-50 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 ring-primary/10 outline-none transition-all"
+                  />
+                </div>
               </div>
 
               {/* Pricing Section */}
@@ -166,7 +270,7 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
                     <input 
                       type="text" 
                       value={costPrice}
-                      onChange={(e) => setCostPrice(e.target.value)}
+                      onChange={(e) => setCostPrice(formatNumberInput(e.target.value))}
                       className="w-full bg-white border-none rounded-2xl px-6 py-4 text-lg font-bold text-primary focus:ring-2 ring-primary/10 outline-none transition-all"
                     />
                   </div>
@@ -175,7 +279,7 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
                     <input 
                       type="text" 
                       value={sellingPrice}
-                      onChange={(e) => setSellingPrice(e.target.value)}
+                      onChange={(e) => setSellingPrice(formatNumberInput(e.target.value))}
                       className="w-full bg-white border-none rounded-2xl px-6 py-4 text-lg font-bold text-primary focus:ring-2 ring-primary/10 outline-none transition-all"
                     />
                   </div>
@@ -193,7 +297,7 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
             {/* Main Image */}
             <div className="space-y-4">
               <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">HÌNH ẢNH CHÍNH</label>
-              <div className="aspect-square border-2 border-dashed border-stone-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-6 bg-white group hover:border-primary/30 transition-all cursor-pointer">
+              <label className="h-72 border-2 border-dashed border-stone-200 rounded-[2rem] flex flex-col items-center justify-center gap-5 bg-white group hover:border-primary/30 transition-all cursor-pointer">
                 <div className="w-16 h-16 bg-stone-50 rounded-full flex items-center justify-center text-stone-300 group-hover:bg-primary/5 group-hover:text-primary transition-all">
                   <Upload size={28} />
                 </div>
@@ -201,42 +305,62 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
                   <p className="text-sm font-bold text-primary">Kéo thả ảnh tại đây</p>
                   <p className="text-xs text-stone-400">Hoặc nhấp để chọn từ máy tính</p>
                 </div>
-              </div>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const nextImage = await prepareImageFromFile(file);
+                      setImage(nextImage);
+                      setError(null);
+                    } catch (err) {
+                      const message = err instanceof Error ? err.message : 'Khong the tai anh.';
+                      setError(message);
+                    } finally {
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                />
+              </label>
+              {image && (
+                <img
+                  src={image}
+                  alt="preview"
+                  className="w-full h-72 object-cover rounded-[2rem] border border-stone-100"
+                />
+              )}
             </div>
 
-            {/* Gallery */}
-            <div className="space-y-4">
-              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">THƯ VIỆN ẢNH PHỤ</label>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="aspect-square bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm flex items-center justify-center text-stone-300">
-                  <ImageIcon size={24} />
-                </div>
-                <div className="aspect-square bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm flex items-center justify-center text-stone-300">
-                  <ImageIcon size={24} />
-                </div>
-                <button className="aspect-square bg-stone-100 rounded-2xl flex flex-col items-center justify-center gap-2 text-stone-400 hover:bg-stone-200 transition-all">
-                  <Plus size={20} />
-                  <span className="text-[10px] font-bold">THÊM</span>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="p-10 border-t border-stone-100 flex justify-end gap-4 bg-stone-50/30">
+          {error && (
+            <div className="mr-auto self-center text-xs font-bold text-red-600">
+              {error}
+            </div>
+          )}
           <button 
             onClick={onClose}
+            disabled={isSaving}
             className="px-10 py-4 bg-white border border-stone-200 text-stone-500 rounded-2xl text-sm font-bold hover:bg-stone-50 transition-all"
           >
             HỦY BỎ
           </button>
           <button 
             onClick={handleSave}
-            className="px-10 py-4 bg-primary text-white rounded-2xl text-sm font-bold shadow-xl hover:bg-primary-light transition-all flex items-center gap-3"
+            disabled={isSaving}
+            className={cn(
+              'px-10 py-4 rounded-2xl text-sm font-bold shadow-xl transition-all flex items-center gap-3',
+              isSaving ? 'bg-stone-200 text-stone-500 shadow-none cursor-not-allowed' : 'bg-primary text-white hover:bg-primary-light'
+            )}
           >
             <Save size={18} />
-            LƯU SẢN PHẨM
+            {isSaving ? 'ĐANG LƯU...' : saveLabel || 'LƯU SẢN PHẨM'}
           </button>
         </div>
 
@@ -254,7 +378,9 @@ export function NewProductModal({ onClose }: NewProductModalProps) {
               </div>
               <div>
                 <p className="text-sm font-bold text-primary">Thành công</p>
-                <p className="text-xs text-stone-500">Đã thêm sản phẩm thành công</p>
+                <p className="text-xs text-stone-500">
+                  {saveLabel ? 'Đã cập nhật sản phẩm thành công' : 'Đã thêm sản phẩm thành công'}
+                </p>
               </div>
               <button 
                 onClick={() => setShowSuccess(false)}

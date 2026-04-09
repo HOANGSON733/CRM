@@ -81,3 +81,37 @@ export interface Service {
   tags?: string[];
   gender?: string;
 }
+
+export interface Product {
+  id: string | number;
+  name: string;
+  brand: string;
+  category: string;
+  sku?: string;
+  volume?: string;
+  description?: string;
+  sellingPrice: string;
+  costPrice: string;
+  stock: number;
+  maxStock: number;
+  image: string;
+  status: 'in-stock' | 'low-stock' | 'out-of-stock';
+}
+
+export interface ServiceCategoryConfig {
+  id: string | number;
+  name: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+  isVisible?: boolean;
+}
+
+export interface ProductCategoryConfig {
+  id: string | number;
+  name: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+  isVisible?: boolean;
+}

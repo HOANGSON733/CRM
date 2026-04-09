@@ -11,8 +11,17 @@ interface DeleteServiceModalProps {
 }
 
 export function DeleteServiceModal({ service, onClose, onConfirm }: DeleteServiceModalProps) {
-  const [confirmText, setConfirmText] = useState('');
-  const isValid = confirmText === 'XÓA';
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await Promise.resolve(onConfirm());
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
@@ -57,35 +66,23 @@ export function DeleteServiceModal({ service, onClose, onConfirm }: DeleteServic
             </p>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
-              NHẬP <span className="text-red-600">"XÓA"</span> ĐỂ XÁC NHẬN
-            </label>
-            <input 
-              type="text" 
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              placeholder="XÓA"
-              className="w-full bg-stone-50 border-none rounded-xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-red-500/10 transition-all text-center tracking-widest"
-            />
-          </div>
-
           <div className="flex flex-col gap-3">
             <button 
-              disabled={!isValid}
-              onClick={onConfirm}
+              disabled={isSubmitting}
+              onClick={handleConfirm}
               className={cn(
                 "w-full py-4 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl",
-                isValid 
-                  ? "bg-red-600 text-white hover:bg-red-700" 
-                  : "bg-stone-100 text-stone-400 cursor-not-allowed shadow-none"
+                isSubmitting
+                  ? "bg-stone-100 text-stone-400 cursor-not-allowed shadow-none"
+                  : "bg-red-600 text-white hover:bg-red-700"
               )}
             >
               <Trash2 size={18} />
-              Xác nhận xóa vĩnh viễn
+              {isSubmitting ? 'Đang xóa...' : 'Xác nhận xóa vĩnh viễn'}
             </button>
             <button 
               onClick={onClose}
+              disabled={isSubmitting}
               className="w-full py-4 text-sm font-bold text-stone-400 hover:text-stone-600 transition-colors"
             >
               Hủy bỏ

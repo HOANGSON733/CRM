@@ -3,14 +3,16 @@ import { motion } from 'motion/react';
 import { X, Plus, Upload, Clock, ChevronDown, Check, Edit3 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Service } from '../../types';
+import { prepareImageFromFile } from '../../lib/imageUpload';
 
 interface EditServiceModalProps {
   service: Service;
   onClose: () => void;
   onConfirm: (updatedService: Service) => void;
+  categories?: string[];
 }
 
-export function EditServiceModal({ service, onClose, onConfirm }: EditServiceModalProps) {
+export function EditServiceModal({ service, onClose, onConfirm, categories = [] }: EditServiceModalProps) {
   const [isActive, setIsActive] = useState(true);
   const [addons, setAddons] = useState<string[]>(() => {
     const tags = Array.isArray(service.tags) ? service.tags : [];
@@ -31,6 +33,8 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
   const [price, setPrice] = useState(service.price);
   const [maxPrice, setMaxPrice] = useState(service.maxPrice || '');
   const [image, setImage] = useState(service.image || '');
+  const [errorMessage, setErrorMessage] = useState('');
+  const categoryOptions = categories.includes(category) ? categories : [category, ...categories];
 
   const toggleAddon = (addon: string) => {
     if (addons.includes(addon)) {
@@ -125,12 +129,19 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => setImage(String(reader.result || ''));
-                  reader.readAsDataURL(file);
+                  try {
+                    const nextImage = await prepareImageFromFile(file);
+                    setImage(nextImage);
+                    setErrorMessage('');
+                  } catch (err) {
+                    const message = err instanceof Error ? err.message : 'Khong the tai anh.';
+                    setErrorMessage(message);
+                  } finally {
+                    e.currentTarget.value = '';
+                  }
                 }}
               />
             </label>
@@ -178,12 +189,11 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full border-b border-stone-100 py-3 text-sm font-bold text-primary focus:border-primary transition-all outline-none appearance-none cursor-pointer pr-8"
                 >
-                  <option>Cắt & Tạo Kiểu</option>
-                  <option>Hóa Chất</option>
-                  <option>Phục Hồi</option>
-                  <option>Dịch vụ Tóc</option>
-                  <option>Chăm sóc Da</option>
-                  <option>Nail & Spa</option>
+                  {categoryOptions.length ? (
+                    categoryOptions.map((item) => <option key={item}>{item}</option>)
+                  ) : (
+                    <option value={category || ''}>{category || 'Chưa có danh mục'}</option>
+                  )}
                 </select>
                 <ChevronDown size={16} className="absolute right-0 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
               </div>
@@ -323,6 +333,7 @@ export function EditServiceModal({ service, onClose, onConfirm }: EditServiceMod
               HỦY BỎ
             </button>
           </div>
+          {errorMessage && <p className="text-xs font-bold text-red-500">{errorMessage}</p>}
         </div>
       </motion.div>
     </div>
