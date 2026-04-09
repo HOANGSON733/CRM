@@ -110,7 +110,7 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
               className="bg-red-50 text-red-600 px-10 py-5 rounded-2xl text-sm font-bold flex items-center gap-3 hover:bg-red-100 transition-all"
             >
               <UserMinus size={20} />
-              Cho Nghỉ Việc
+              Xin nghỉ 
             </button>
           </div>
         </div>
