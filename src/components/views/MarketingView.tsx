@@ -20,9 +20,11 @@ import { cn } from '../../lib/utils';
 interface MarketingViewProps {
   key?: string;
   onNewPromoCode?: () => void;
+  authToken: string | null;
+  customersCount?: number;
 }
 
-export function MarketingView({ onNewPromoCode }: MarketingViewProps) {
+export function MarketingView({ onNewPromoCode, customersCount = 0 }: MarketingViewProps) {
   const [activeTab, setActiveTab] = useState('sms');
 
   const tiers = [
@@ -38,10 +40,7 @@ export function MarketingView({ onNewPromoCode }: MarketingViewProps) {
     { id: 3, title: 'Nhắc đặt lịch lại', desc: 'Nhắc sau 30 ngày im lặng', icon: <Calendar size={18} />, active: false },
   ];
 
-  const promoCodes = [
-    { code: 'SPRING2024', discount: '-15%', status: 'ĐANG CHẠY', expiry: '30 TH04, 2024', usage: '45/100', color: 'border-amber-400' },
-    { code: 'VALENTINE', discount: '-100k', status: 'ĐANG CHẠY', expiry: '15 TH02, 2024', usage: '120/200', color: 'border-red-400' },
-  ];
+  const promoCodes: Array<{ code: string; discount: string; status: string; expiry: string; usage: string; color: string }> = [];
 
   return (
     <div className="p-8 space-y-8 max-w-[1400px] mx-auto">
@@ -56,7 +55,7 @@ export function MarketingView({ onNewPromoCode }: MarketingViewProps) {
           </p>
         </div>
         <div className="text-right">
-          <p className="text-4xl font-serif text-primary">1.2k+</p>
+          <p className="text-4xl font-serif text-primary">{customersCount.toLocaleString('vi-VN')}</p>
           <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mt-1">THÀNH VIÊN TÍCH CỰC</p>
         </div>
       </div>
@@ -232,6 +231,11 @@ export function MarketingView({ onNewPromoCode }: MarketingViewProps) {
                   <div className="absolute top-1/2 -right-3 w-6 h-6 bg-stone-50 rounded-full -translate-y-1/2" />
                 </div>
               ))}
+              {!promoCodes.length && (
+                <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-stone-100 text-sm text-stone-400">
+                  Chưa có mã khuyến mãi nào (đang chờ kết nối dữ liệu thật).
+                </div>
+              )}
             </div>
           </div>
         </div>

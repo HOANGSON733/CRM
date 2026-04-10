@@ -45,6 +45,9 @@ export function ProductsView({
   const [selectedCategory, setSelectedCategory] = useState('Tất cả danh mục');
 
   const categories = ['Tất cả danh mục', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))];
+  const pageStart = Math.max(1, page - 1);
+  const pageEnd = Math.min(totalPages, pageStart + 2);
+  const visiblePages = Array.from({ length: pageEnd - pageStart + 1 }, (_, i) => pageStart + i);
   const visibleProducts = products.filter((product) => {
     const matchesCategory = selectedCategory === 'Tất cả danh mục' || product.category === selectedCategory;
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -248,87 +251,89 @@ export function ProductsView({
         </div>
       ) : (
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-stone-100 overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-stone-100 bg-stone-50/50">
-                <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Sản phẩm</th>
-                <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Danh mục</th>
-                <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Giá</th>
-                <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Tồn kho</th>
-                <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Trạng thái</th>
-                <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest text-center">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleProducts.map((product) => (
-                <tr key={product.id} className="border-b border-stone-50 hover:bg-stone-50/40 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-12 h-12 rounded-xl object-cover border border-stone-100"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div>
-                        <p className="text-sm font-bold text-primary">{product.name}</p>
-                        <p className="text-[10px] text-stone-400 uppercase tracking-widest">{product.brand}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="bg-stone-100 text-stone-500 px-3 py-1 rounded-lg text-[10px] font-bold uppercase">
-                      {product.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-bold text-primary">{product.sellingPrice}đ</p>
-                    <p className="text-[10px] text-stone-400">Nhập: {product.costPrice}đ</p>
-                  </td>
-                  <td className="px-6 py-4 min-w-[180px]">
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-[10px] font-bold">
-                        <span className="text-stone-400">{product.stock} sp</span>
-                        <span className="text-primary">{Math.round((product.stock / product.maxStock) * 100)}%</span>
-                      </div>
-                      <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            'h-full rounded-full',
-                            product.status === 'in-stock' ? 'bg-amber-800' : product.status === 'low-stock' ? 'bg-red-500' : 'bg-stone-300'
-                          )}
-                          style={{ width: `${(product.stock / product.maxStock) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">{getStatusBadge(product)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={() => onEditProduct?.(product)}
-                        className="p-2 rounded-lg border border-stone-100 text-stone-500 hover:text-primary hover:bg-white"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        onClick={() => onRestockProduct?.(product)}
-                        className="px-3 py-2 rounded-lg bg-stone-100 text-[11px] font-bold text-primary hover:bg-stone-200"
-                      >
-                        Nhập
-                      </button>
-                      <button
-                        onClick={() => onDeleteProduct?.(product)}
-                        className="p-2 rounded-lg border border-red-100 text-red-500 hover:bg-red-50"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
+          <div className="max-h-[680px] overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/50">
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Sản phẩm</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Danh mục</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Giá</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Tồn kho</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Trạng thái</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest text-center">Thao tác</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visibleProducts.map((product) => (
+                  <tr key={product.id} className="border-b border-stone-50 hover:bg-stone-50/40 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="w-12 h-12 rounded-xl object-cover border border-stone-100"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div>
+                          <p className="text-sm font-bold text-primary">{product.name}</p>
+                          <p className="text-[10px] text-stone-400 uppercase tracking-widest">{product.brand}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="bg-stone-100 text-stone-500 px-3 py-1 rounded-lg text-[10px] font-bold uppercase">
+                        {product.category}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold text-primary">{product.sellingPrice}đ</p>
+                      <p className="text-[10px] text-stone-400">Nhập: {product.costPrice}đ</p>
+                    </td>
+                    <td className="px-6 py-4 min-w-[180px]">
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-[10px] font-bold">
+                          <span className="text-stone-400">{product.stock} sp</span>
+                          <span className="text-primary">{Math.round((product.stock / product.maxStock) * 100)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              'h-full rounded-full',
+                              product.status === 'in-stock' ? 'bg-amber-800' : product.status === 'low-stock' ? 'bg-red-500' : 'bg-stone-300'
+                            )}
+                            style={{ width: `${(product.stock / product.maxStock) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">{getStatusBadge(product)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => onEditProduct?.(product)}
+                          className="p-2 rounded-lg border border-stone-100 text-stone-500 hover:text-primary hover:bg-white"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => onRestockProduct?.(product)}
+                          className="px-3 py-2 rounded-lg bg-stone-100 text-[11px] font-bold text-primary hover:bg-stone-200"
+                        >
+                          Nhập
+                        </button>
+                        <button
+                          onClick={() => onDeleteProduct?.(product)}
+                          className="p-2 rounded-lg border border-red-100 text-red-500 hover:bg-red-50"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -343,23 +348,34 @@ export function ProductsView({
         <p className="text-xs font-medium text-stone-400">
           Hiển thị {visibleProducts.length} trong trang {page} / {totalPages} - tổng {total} sản phẩm
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             disabled={page <= 1}
             onClick={() => onPageChange?.(Math.max(1, page - 1))}
-            className="w-10 h-10 rounded-xl border border-stone-100 flex items-center justify-center text-stone-400 hover:bg-stone-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-11 h-11 rounded-2xl border border-stone-100 bg-white flex items-center justify-center text-stone-400 hover:bg-stone-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </button>
-          <button className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center text-sm font-bold shadow-lg">
-            {page}
-          </button>
+          {visiblePages.map((p) => (
+            <button
+              key={p}
+              onClick={() => onPageChange?.(p)}
+              className={cn(
+                'w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-bold transition-all',
+                p === page
+                  ? 'bg-primary text-white shadow-lg'
+                  : 'bg-white border border-stone-100 text-stone-500 hover:bg-stone-50'
+              )}
+            >
+              {p}
+            </button>
+          ))}
           <button
             disabled={page >= totalPages}
             onClick={() => onPageChange?.(Math.min(totalPages, page + 1))}
-            className="w-10 h-10 rounded-xl border border-stone-100 flex items-center justify-center text-stone-400 hover:bg-stone-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-11 h-11 rounded-2xl border border-stone-100 bg-white flex items-center justify-center text-stone-400 hover:bg-stone-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={18} />
           </button>
         </div>
       </div>

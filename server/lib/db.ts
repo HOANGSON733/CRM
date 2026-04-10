@@ -12,6 +12,7 @@ export async function connectMongo() {
   await db.collection('products').createIndex({ sku: 1 }, { unique: true, sparse: true });
   await db.collection('service_categories').createIndex({ normalizedName: 1 }, { unique: true });
   await db.collection('product_categories').createIndex({ normalizedName: 1 }, { unique: true });
+  await db.collection('pos_orders').createIndex({ createdAt: -1 });
   await seedDefaultServiceCategories();
   await seedDefaultProductCategories();
   await seedAdminUser();

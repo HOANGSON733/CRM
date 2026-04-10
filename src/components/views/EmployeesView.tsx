@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   Search, 
@@ -11,11 +11,11 @@ import {
   Clock 
 } from 'lucide-react';
 import { KPICard } from '../KPICard';
-import { staffPerformanceData } from '../../data/mockData';
 import { cn } from '../../lib/utils';
 import { Employee } from '../../types';
 
 interface EmployeesViewProps {
+  authToken: string | null;
   employees: Employee[];
   onNewEmployee: () => void;
   onViewProfile: (employee: Employee) => void;
@@ -44,7 +44,39 @@ function getStatusBadge(status: Employee['status']) {
   return { label: 'RẢNH', className: 'bg-secondary text-white' };
 }
 
-export function EmployeesView({ employees, onNewEmployee, onViewProfile }: EmployeesViewProps) {
+type StaffPerf = { name: string; value: number; customers: number };
+
+export function EmployeesView({ authToken, employees, onNewEmployee, onViewProfile }: EmployeesViewProps) {
+  const [staffPerformanceData, setStaffPerformanceData] = useState<StaffPerf[]>([]);
+
+  useEffect(() => {
+    if (!authToken) return;
+    let cancelled = false;
+    fetch('/api/analytics/staff-performance', {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) {
+          const data = await r.json().catch(() => null);
+          throw new Error(data?.message || 'Không thể tải hiệu suất nhân viên.');
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setStaffPerformanceData(Array.isArray(data?.staffPerformanceData) ? data.staffPerformanceData : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStaffPerformanceData([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken]);
+
+  const workingCount = employees.filter((e) => e.status === 'busy' || e.status === 'available').length;
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -99,7 +131,7 @@ export function EmployeesView({ employees, onNewEmployee, onViewProfile }: Emplo
         <div className="bg-primary p-8 rounded-[2rem] shadow-lg text-white relative overflow-hidden flex flex-col justify-center">
           <div className="relative z-10 space-y-1">
             <p className="text-[11px] font-bold opacity-60 uppercase tracking-widest">ĐANG LÀM VIỆC</p>
-            <h3 className="text-5xl font-serif">18</h3>
+            <h3 className="text-5xl font-serif">{workingCount}</h3>
           </div>
           <div className="absolute -right-4 -bottom-4 opacity-10">
             <Plus size={120} />

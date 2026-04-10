@@ -185,8 +185,8 @@ export function SettingsView({
   };
 
   const tabs = [
-    'Danh mục dịch vụ', 'Cấp bậc nhân viên', 'Thợ mặc định', 
-    'Nguồn khách', 'Lý do hủy', 'Danh mục sản phẩm', 'Thời lượng'
+    'Danh mục dịch vụ', 'Danh mục sản phẩm', 'Cấp bậc nhân viên', 'Thợ mặc định', 
+    'Nguồn khách', 'Lý do hủy', 'Thời lượng'
   ];
 
   const staffLevels = [

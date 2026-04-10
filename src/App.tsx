@@ -23,7 +23,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { Customer, View } from './types';
-import { servicesData } from './data/mockData';
 
 // Components
 import { SidebarItem } from './components/SidebarItem';
@@ -41,7 +40,6 @@ import { LoginView } from './components/views/LoginView';
 import { ProductsView } from './components/views/ProductsView';
 import { NewAppointmentModal } from './components/modals/NewAppointmentModal';
 import { NewCustomerModal } from './components/modals/NewCustomerModal';
-import { WalkInCustomerModal } from './components/modals/WalkInCustomerModal';
 import { DeleteCustomerModal } from './components/modals/DeleteCustomerModal';
 import { AddShiftModal } from './components/modals/AddShiftModal';
 import { NewEmployeeModal } from './components/modals/NewEmployeeModal';
@@ -109,7 +107,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<View>(() => getTabFromPath(window.location.pathname));
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
-  const [isWalkInCustomerModalOpen, setIsWalkInCustomerModalOpen] = useState(false);
   const [isNewEmployeeModalOpen, setIsNewEmployeeModalOpen] = useState(false);
   const [isEditEmployeeModalOpen, setIsEditEmployeeModalOpen] = useState(false);
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
@@ -124,7 +121,7 @@ export default function App() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [services, setServices] = useState<Service[]>(() => servicesData.flatMap((c) => c.services));
+  const [services, setServices] = useState<Service[]>([]);
   const [serviceCategories, setServiceCategories] = useState<ServiceCategoryConfig[]>([]);
   const [productCategories, setProductCategories] = useState<ProductCategoryConfig[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -183,7 +180,7 @@ export default function App() {
   };
 
   const loadProducts = async (token: string, page = 1) => {
-    const response = await fetch(`/api/products?page=${page}&pageSize=12`, {
+    const response = await fetch(`/api/products?page=${page}&pageSize=15`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) {
@@ -207,6 +204,16 @@ export default function App() {
     }
     const data = await response.json();
     setProductCategories(Array.isArray(data?.categories) ? data.categories : []);
+  };
+
+  const reloadAfterPosCheckout = async () => {
+    if (!authToken) return;
+    try {
+      await loadCustomers(authToken);
+      await loadProducts(authToken, productsPage);
+    } catch {
+      // best-effort refresh; POS already succeeded
+    }
   };
 
   useEffect(() => {
@@ -235,7 +242,7 @@ export default function App() {
         setIsLoggedIn(false);
         setCustomers([]);
         setEmployees([]);
-        setServices(servicesData.flatMap((c) => c.services));
+        setServices([]);
         setServiceCategories([]);
         setProductCategories([]);
         setProducts([]);
@@ -271,7 +278,7 @@ export default function App() {
     setIsLoggedIn(false);
     setCustomers([]);
     setEmployees([]);
-    setServices(servicesData.flatMap((c) => c.services));
+    setServices([]);
     setServiceCategories([]);
     setProductCategories([]);
     setProducts([]);
@@ -601,33 +608,6 @@ export default function App() {
     await loadCustomers(authToken);
   };
 
-  const handleCreateWalkInCustomer = async (payload: {
-    name: string;
-    phone: string;
-    birthday: string;
-    assignedEmployee: string;
-    addPoints: boolean;
-    pointsToEarn: number;
-  }) => {
-    if (!authToken) {
-      throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
-    }
-
-    const response = await fetch('/api/customers/walk-in', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => null);
-      throw new Error(data?.message || 'Không thể lưu khách vãng lai.');
-    }
-  };
-
   const handleCreateEmployee = async (payload: {
     name: string;
     phone: string;
@@ -909,11 +889,11 @@ export default function App() {
           {activeTab === 'dashboard' ? (
             <DashboardView
               key="dashboard"
+              authToken={authToken}
               onNewCustomer={() => setIsNewCustomerModalOpen(true)}
-              onNewWalkInCustomer={() => setIsWalkInCustomerModalOpen(true)}
             />
           ) : activeTab === 'appointments' ? (
-            <AppointmentsView key="appointments" onNewAppointment={() => setIsNewAppointmentModalOpen(true)} />
+            <AppointmentsView key="appointments" authToken={authToken} onNewAppointment={() => setIsNewAppointmentModalOpen(true)} />
           ) : activeTab === 'customers' ? (
             <CustomersView 
               key="customers" 
@@ -924,6 +904,7 @@ export default function App() {
           ) : activeTab === 'employees' ? (
             <EmployeesView 
               key="employees" 
+              authToken={authToken}
               employees={employees}
               onNewEmployee={() => setIsNewEmployeeModalOpen(true)} 
               onViewProfile={(emp) => {
@@ -980,9 +961,17 @@ export default function App() {
               onPageChange={(nextPage) => setProductsPage(nextPage)}
             />
           ) : activeTab === 'reports' ? (
-            <ReportsView key="reports" />
+            <ReportsView key="reports" authToken={authToken} />
           ) : activeTab === 'pos' ? (
-            <POSView key="pos" />
+            <POSView
+              authToken={authToken}
+              customers={customers}
+              employees={employees}
+              services={services}
+              onCheckoutSuccess={() => {
+                reloadAfterPosCheckout().catch(() => undefined);
+              }}
+            />
           ) : activeTab === 'settings' ? (
             <SettingsView
               services={services}
@@ -999,6 +988,8 @@ export default function App() {
           ) : activeTab === 'marketing' ? (
             <MarketingView 
               key="marketing" 
+              authToken={authToken}
+              customersCount={customers.length}
               onNewPromoCode={() => setIsNewPromoCodeModalOpen(true)} 
             />
           ) : null}
@@ -1008,7 +999,12 @@ export default function App() {
       {/* New Appointment Modal */}
       <AnimatePresence>
         {isNewAppointmentModalOpen && (
-          <NewAppointmentModal onClose={() => setIsNewAppointmentModalOpen(false)} />
+          <NewAppointmentModal
+            authToken={authToken}
+            services={services}
+            employees={employees}
+            onClose={() => setIsNewAppointmentModalOpen(false)}
+          />
         )}
       </AnimatePresence>
 
@@ -1018,16 +1014,7 @@ export default function App() {
           <NewCustomerModal
             onClose={() => setIsNewCustomerModalOpen(false)}
             onSave={handleCreateCustomer}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Walk-in Customer Modal */}
-      <AnimatePresence>
-        {isWalkInCustomerModalOpen && (
-          <WalkInCustomerModal
-            onClose={() => setIsWalkInCustomerModalOpen(false)}
-            onSave={handleCreateWalkInCustomer}
+            employees={employees}
           />
         )}
       </AnimatePresence>

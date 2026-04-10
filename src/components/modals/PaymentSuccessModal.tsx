@@ -6,9 +6,10 @@ interface PaymentSuccessModalProps {
   onClose: () => void;
   amount: string;
   customerName: string;
+  orderId?: string | null;
 }
 
-export function PaymentSuccessModal({ onClose, amount, customerName }: PaymentSuccessModalProps) {
+export function PaymentSuccessModal({ onClose, amount, customerName, orderId }: PaymentSuccessModalProps) {
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
       <motion.div 
@@ -41,6 +42,12 @@ export function PaymentSuccessModal({ onClose, amount, customerName }: PaymentSu
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">KHÁCH HÀNG</span>
             <span className="text-sm font-bold text-primary">{customerName}</span>
           </div>
+          {orderId ? (
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">MÃ HÓA ĐƠN</span>
+              <span className="text-sm font-bold text-primary">{orderId}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between items-center">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">SỐ TIỀN</span>
             <span className="text-xl font-serif text-primary">{amount} đ</span>

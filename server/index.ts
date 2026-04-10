@@ -10,6 +10,8 @@ import servicesRouter from './routes/services.routes';
 import productsRouter from './routes/products.routes';
 import serviceCategoriesRouter from './routes/serviceCategories.routes';
 import productCategoriesRouter from './routes/productCategories.routes';
+import posRouter from './routes/pos.routes';
+import analyticsRouter from './routes/analytics.routes';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -23,6 +25,8 @@ app.use('/api/services', servicesRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/service-categories', serviceCategoriesRouter);
 app.use('/api/product-categories', productCategoriesRouter);
+app.use('/api/pos', posRouter);
+app.use('/api/analytics', analyticsRouter);
 
 connectMongo()
   .then(() => {

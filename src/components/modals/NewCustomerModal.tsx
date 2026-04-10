@@ -2,11 +2,12 @@ import React, { useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Upload } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { employeesData } from '../../data/mockData';
 import { prepareImageFromFile } from '../../lib/imageUpload';
+import { Employee } from '../../types';
 
 interface NewCustomerModalProps {
   onClose: () => void;
+  employees: Employee[];
   onSave: (payload: {
     name: string;
     phone: string;
@@ -20,14 +21,14 @@ interface NewCustomerModalProps {
   }) => Promise<void>;
 }
 
-export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
+export function NewCustomerModal({ onClose, onSave, employees }: NewCustomerModalProps) {
   const [selectedSource, setSelectedSource] = useState('Facebook');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [birthday, setBirthday] = useState('');
   const [gender, setGender] = useState('Nữ');
-  const [assignedEmployee, setAssignedEmployee] = useState(employeesData[0]?.name || '');
+  const [assignedEmployee, setAssignedEmployee] = useState(employees[0]?.name || '');
   const [notes, setNotes] = useState('');
   const [avatar, setAvatar] = useState<string | undefined>(undefined);
   const [avatarName, setAvatarName] = useState('');
@@ -110,7 +111,7 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
           
           <div className="absolute inset-0 opacity-40">
             <img 
-              src="https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg" 
+              src="https://cdn0397.cdn4s.com/media/guong-salon-_-tiem-toc/e30cbd5e0f8a5a711a4480a0d9dbcea2.webp" 
               alt="Salon Interior" 
               className="w-full h-full object-cover"
             />
@@ -179,7 +180,7 @@ export function NewCustomerModal({ onClose, onSave }: NewCustomerModalProps) {
                   onChange={(e) => setAssignedEmployee(e.target.value)}
                   className="w-full bg-stone-50 border border-stone-100 rounded-xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all appearance-none"
                 >
-                  {employeesData.map((employee) => (
+                  {employees.map((employee) => (
                     <option key={employee.id} value={employee.name}>
                       {employee.name}
                     </option>

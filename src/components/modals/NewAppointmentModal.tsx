@@ -10,34 +10,28 @@ import {
   ChevronRight 
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Employee, Service } from '../../types';
 
 interface NewAppointmentModalProps {
   onClose: () => void;
+  authToken: string | null;
+  services: Service[];
+  employees: Employee[];
 }
 
-export function NewAppointmentModal({ onClose }: NewAppointmentModalProps) {
-  const [selectedService, setSelectedService] = useState(1);
-  const [selectedStylist, setSelectedStylist] = useState(1);
+export function NewAppointmentModal({ onClose, services, employees }: NewAppointmentModalProps) {
+  const [selectedService, setSelectedService] = useState<string>(() => String(services[0]?.id || ''));
+  const [selectedStylist, setSelectedStylist] = useState<string>(() => String(employees[0]?.id || 'any'));
   const [selectedTime, setSelectedTime] = useState('11:00');
   const [smsReminder, setSmsReminder] = useState(true);
-
-  const services = [
-    { id: 1, name: 'Cắt tóc & Gội đầu thảo dược', duration: '60 phút', price: '450.000₫' },
-    { id: 2, name: 'Nhuộm màu Editorial', duration: '120 phút', price: '1.200.000₫' },
-  ];
-
-  const stylists = [
-    { id: 1, name: 'Hoàng Anh', role: 'MASTER', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop' },
-    { id: 2, name: 'Linh Chi', role: 'SENIOR', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop' },
-    { id: 3, name: 'Minh Tú', role: 'STYLIST', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop' },
-    { id: 4, name: 'Bất kỳ', role: 'TÙY CHỌN', icon: <Users size={18} /> },
-  ];
 
   const timeSlots = [
     '09:00', '09:30', '10:00', '10:30',
     '11:00', '11:30', '13:30', '14:00',
     '14:30', '15:00', '15:30', '16:00'
   ];
+
+  const selectedServiceObj = services.find((s) => String(s.id) === String(selectedService));
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -88,18 +82,18 @@ export function NewAppointmentModal({ onClose }: NewAppointmentModalProps) {
               <div className="space-y-3">
                 {services.map((s) => (
                   <div 
-                    key={s.id}
-                    onClick={() => setSelectedService(s.id)}
+                    key={String(s.id)}
+                    onClick={() => setSelectedService(String(s.id))}
                     className={cn(
                       "p-5 rounded-2xl border-2 transition-all cursor-pointer flex justify-between items-center group",
-                      selectedService === s.id ? "border-primary bg-primary/[0.02]" : "border-stone-50 bg-stone-50 hover:border-stone-200"
+                      String(selectedService) === String(s.id) ? "border-primary bg-primary/[0.02]" : "border-stone-50 bg-stone-50 hover:border-stone-200"
                     )}
                   >
                     <div>
                       <p className="text-sm font-bold text-primary mb-1">{s.name}</p>
-                      <p className="text-[11px] text-stone-400">{s.duration} • {s.price}</p>
+                      <p className="text-[11px] text-stone-400">{s.duration} • {s.price}₫</p>
                     </div>
-                    {selectedService === s.id ? (
+                    {String(selectedService) === String(s.id) ? (
                       <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center text-white">
                         <CheckCircle2 size={14} />
                       </div>
@@ -113,6 +107,9 @@ export function NewAppointmentModal({ onClose }: NewAppointmentModalProps) {
                 <button className="w-full py-4 border-2 border-dashed border-stone-200 rounded-2xl text-[11px] font-bold text-stone-400 uppercase tracking-widest hover:border-stone-400 hover:text-stone-600 transition-all">
                   + Thêm dịch vụ khác
                 </button>
+                {!services.length && (
+                  <p className="text-sm text-stone-400">Chưa có dịch vụ trong hệ thống.</p>
+                )}
               </div>
             </div>
 
@@ -120,7 +117,16 @@ export function NewAppointmentModal({ onClose }: NewAppointmentModalProps) {
             <div className="space-y-4">
               <label className="text-[11px] font-bold text-stone-400 uppercase tracking-widest">CHUYÊN VIÊN</label>
               <div className="grid grid-cols-2 gap-3">
-                {stylists.map((st) => (
+                {[
+                  ...employees.map((e) => ({
+                    id: String(e.id),
+                    name: e.name,
+                    role: e.role || 'STAFF',
+                    avatar: e.avatar || '',
+                    icon: null as any,
+                  })),
+                  { id: 'any', name: 'Bất kỳ', role: 'TÙY CHỌN', avatar: '', icon: <Users size={18} /> },
+                ].map((st) => (
                   <div 
                     key={st.id}
                     onClick={() => setSelectedStylist(st.id)}
@@ -142,6 +148,9 @@ export function NewAppointmentModal({ onClose }: NewAppointmentModalProps) {
                     </div>
                   </div>
                 ))}
+                {!employees.length && (
+                  <p className="text-sm text-stone-400 col-span-2">Chưa có nhân viên trong hệ thống.</p>
+                )}
               </div>
             </div>
           </div>
@@ -244,12 +253,12 @@ export function NewAppointmentModal({ onClose }: NewAppointmentModalProps) {
           <div className="flex items-center gap-6">
             <div>
               <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỔNG THỜI GIAN</p>
-              <p className="text-sm font-bold text-primary">60 phút</p>
+              <p className="text-sm font-bold text-primary">{selectedServiceObj?.duration || '—'}</p>
             </div>
             <div className="w-px h-8 bg-stone-200" />
             <div>
               <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỔNG CHI PHÍ</p>
-              <p className="text-sm font-bold text-secondary">450.000₫</p>
+              <p className="text-sm font-bold text-secondary">{selectedServiceObj?.price ? `${selectedServiceObj.price}₫` : '—'}</p>
             </div>
           </div>
           <div className="flex gap-4">

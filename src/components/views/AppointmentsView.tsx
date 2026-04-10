@@ -13,16 +13,17 @@ import {
   Trash2 
 } from 'lucide-react';
 import { FilterCheckbox } from '../FilterCheckbox';
-import { scheduleData } from '../../data/mockData';
 import { cn } from '../../lib/utils';
 
 interface AppointmentsViewProps {
+  authToken: string | null;
   onNewAppointment: () => void;
   key?: string;
 }
 
 export function AppointmentsView({ onNewAppointment }: AppointmentsViewProps) {
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const scheduleData: any[] = [];
 
   return (
     <motion.div 
@@ -146,6 +147,11 @@ export function AppointmentsView({ onNewAppointment }: AppointmentsViewProps) {
                 </div>
               </motion.div>
             ))}
+            {!scheduleData.length && (
+              <div className="text-sm text-stone-400 pt-6 pl-16">
+                Chưa có lịch hẹn nào (module lịch hẹn đang chờ kết nối dữ liệu thật).
+              </div>
+            )}
           </div>
         </div>
 

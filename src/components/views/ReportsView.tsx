@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   TrendingUp, 
@@ -32,58 +32,115 @@ import {
 } from 'recharts';
 import { cn } from '../../lib/utils';
 
-const revenueData = [
-  { name: '01 TH12', actual: 4000, target: 4500 },
-  { name: '07 TH12', actual: 3000, target: 4200 },
-  { name: '14 TH12', actual: 5000, target: 4800 },
-  { name: '21 TH12', actual: 4500, target: 5000 },
-  { name: '28 TH12', actual: 6000, target: 5500 },
-  { name: '31 TH12', actual: 7500, target: 6000 },
-];
+interface ReportsViewProps {
+  authToken: string | null;
+  key?: string;
+}
 
-const customerData = [
-  { name: 'Khách quay lại', value: 65, color: '#4a0e0e' },
-  { name: 'Khách mới', value: 35, color: '#c5a059' },
-];
+type ReportsAnalytics = {
+  kpis: {
+    totalRevenue: number;
+    ordersCount: number;
+    customersServed: number;
+  };
+  revenueData: Array<{ name: string; actual: number; target: number }>;
+  customerData: Array<{ name: string; value: number; color: string }>;
+  serviceReports: Array<{ id: number; name: string; quantity: number; revenue: string; growth: number; image?: string }>;
+  appointmentStatus: { completed: number; cancelled: number; noShow: number };
+  todayOrderDetails: Array<{ id: string; time: string; soldItems: string; doneBy: string; total: string }>;
+};
 
-const serviceReports = [
-  { 
-    id: 1, 
-    name: 'Nhuộm Balayage Cao Cấp', 
-    quantity: 142, 
-    revenue: '42.600.000', 
-    growth: 18.5, 
-    image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&q=80&w=200' 
-  },
-  { 
-    id: 2, 
-    name: 'Cắt & Tạo Kiểu Nghệ Thuật', 
-    quantity: 328, 
-    revenue: '31.160.000', 
-    growth: 5.2, 
-    image: 'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&q=80&w=200' 
-  },
-  { 
-    id: 3, 
-    name: 'Gội Đầu Dưỡng Sinh & Massage', 
-    quantity: 456, 
-    revenue: '27.360.000', 
-    growth: 24.1, 
-    image: 'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&q=80&w=200' 
-  },
-  { 
-    id: 4, 
-    name: 'Uốn/Duỗi Keratin Phục Hồi', 
-    quantity: 95, 
-    revenue: '28.500.000', 
-    growth: -2.4, 
-    image: 'https://images.unsplash.com/photo-1560869713-7d0a29430803?auto=format&fit=crop&q=80&w=200' 
-  },
-];
-
-export function ReportsView() {
+export function ReportsView({ authToken }: ReportsViewProps) {
   const [timeFilter, setTimeFilter] = useState('Tháng này');
   const [reportTab, setReportTab] = useState('Theo dịch vụ');
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<ReportsAnalytics | null>(null);
+  const [staffPerformanceData, setStaffPerformanceData] = useState<Array<{ name: string; value: number; customers: number }>>([]);
+  const [showAllRows, setShowAllRows] = useState(false);
+  const [customFrom, setCustomFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return d.toISOString().slice(0, 10);
+  });
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const queryString = useMemo(() => {
+    if (timeFilter === 'Hôm nay') return 'today';
+    if (timeFilter === 'Tuần này') return 'week';
+    if (timeFilter === 'Tháng này') return 'month';
+    if (timeFilter === 'Tùy chỉnh') {
+      if (!customFrom || !customTo) return 'month';
+      return `custom&from=${encodeURIComponent(customFrom)}&to=${encodeURIComponent(customTo)}`;
+    }
+    return 'month';
+  }, [timeFilter, customFrom, customTo]);
+
+  useEffect(() => {
+    if (!authToken) return;
+    let cancelled = false;
+    setLoading(true);
+    fetch(`/api/analytics/reports?range=${queryString}`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => null);
+          throw new Error(err?.message || 'Không thể tải báo cáo.');
+        }
+        return r.json();
+      })
+      .then((json) => {
+        if (cancelled) return;
+        setData(json);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setData(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken, queryString]);
+
+  useEffect(() => {
+    if (!authToken) return;
+    let cancelled = false;
+    fetch('/api/analytics/staff-performance', {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) return { staffPerformanceData: [] };
+        return r.json();
+      })
+      .then((json) => {
+        if (cancelled) return;
+        setStaffPerformanceData(Array.isArray(json?.staffPerformanceData) ? json.staffPerformanceData : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStaffPerformanceData([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken]);
+
+  const revenueData = data?.revenueData || [];
+  const customerData = data?.customerData || [];
+  const serviceReports = data?.serviceReports || [];
+  const appointmentStatus = data?.appointmentStatus || { completed: 0, cancelled: 0, noShow: 0 };
+  const todayOrderDetails = data?.todayOrderDetails || [];
+  const kpis = data?.kpis || { totalRevenue: 0, ordersCount: 0, customersServed: 0 };
+  const isServiceTab = reportTab === 'Theo dịch vụ';
+  const tableRows = isServiceTab ? serviceReports : staffPerformanceData;
+  const defaultVisibleCount = 6;
+  const visibleRows = showAllRows ? tableRows : tableRows.slice(0, defaultVisibleCount);
+  const hasMoreRows = tableRows.length > defaultVisibleCount;
 
   return (
     <motion.div 
@@ -116,35 +173,63 @@ export function ReportsView() {
           ))}
         </div>
       </div>
+      {timeFilter === 'Tùy chỉnh' && (
+        <div className="bg-white rounded-2xl border border-stone-100 p-4 flex items-end gap-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Từ ngày</label>
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-2 focus:ring-primary/10"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Đến ngày</label>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-2.5 text-sm text-primary outline-none focus:ring-2 focus:ring-primary/10"
+            />
+          </div>
+          <button
+            onClick={() => setTimeFilter('Tùy chỉnh')}
+            className="px-6 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-light transition-colors"
+          >
+            Áp dụng
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard 
           label="TỔNG DOANH THU" 
-          value="158.420.000 đ" 
-          trend="+12.5% so với tháng trước" 
-          trendUp={true}
+          value={`${Math.round(kpis.totalRevenue).toLocaleString('vi-VN')} đ`} 
+          trend={loading ? 'Đang tải…' : 'Theo POS'} 
+          trendUp={null}
           icon={<DollarSign size={20} />}
         />
         <KPICard 
-          label="KHÁCH PHỤC VỤ" 
-          value="1.248" 
-          trend="+4.2% so với tháng trước" 
-          trendUp={true}
+          label="GIAO DỊCH" 
+          value={String(kpis.ordersCount)} 
+          trend="Theo POS" 
+          trendUp={null}
           icon={<Users size={20} />}
         />
         <KPICard 
-          label="TỶ LỆ QUAY LẠI" 
-          value="68.5%" 
-          trend="Ổn định mục tiêu tháng" 
+          label="KHÁCH PHỤC VỤ" 
+          value={String(kpis.customersServed)} 
+          trend="Khách có ID (không tính vãng lai)" 
           trendUp={null}
           icon={<RefreshCcw size={20} />}
         />
         <KPICard 
-          label="TỶ LỆ HỦY LỊCH" 
-          value="3.2%" 
-          trend="-1.5% Giảm đáng kể" 
-          trendUp={true}
+          label="HỦY / VẮNG" 
+          value={`${appointmentStatus.cancelled + appointmentStatus.noShow}`} 
+          trend="Chưa áp dụng (lịch hẹn chưa kết nối)" 
+          trendUp={null}
           icon={<Calendar size={20} />}
         />
       </div>
@@ -241,7 +326,7 @@ export function ReportsView() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-3xl font-serif text-primary">1.2k</span>
+                <span className="text-3xl font-serif text-primary">{kpis.customersServed}</span>
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỔNG CỘNG</span>
               </div>
             </div>
@@ -274,22 +359,22 @@ export function ReportsView() {
             <StatusProgress 
               icon={<CheckCircle2 size={20} className="text-green-500" />}
               label="Đã hoàn thành"
-              value={842}
-              percentage={82}
+              value={appointmentStatus.completed}
+              percentage={100}
               color="bg-green-500"
             />
             <StatusProgress 
               icon={<XCircle size={20} className="text-red-500" />}
               label="Đã hủy"
-              value={156}
-              percentage={15}
+              value={appointmentStatus.cancelled}
+              percentage={0}
               color="bg-red-500"
             />
             <StatusProgress 
               icon={<UserX size={20} className="text-amber-500" />}
               label="Khách vắng mặt"
-              value={32}
-              percentage={3}
+              value={appointmentStatus.noShow}
+              percentage={0}
               color="bg-amber-500"
             />
           </div>
@@ -303,7 +388,10 @@ export function ReportsView() {
             {['Theo dịch vụ', 'Theo nhân viên'].map((tab) => (
               <button
                 key={tab}
-                onClick={() => setReportTab(tab)}
+                onClick={() => {
+                  setReportTab(tab);
+                  setShowAllRows(false);
+                }}
                 className={cn(
                   "text-sm font-bold transition-all relative pb-2",
                   reportTab === tab 
@@ -335,44 +423,128 @@ export function ReportsView() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-stone-50/50">
-                <th className="px-10 py-6 text-[10px] font-bold text-stone-400 uppercase tracking-widest">TÊN DỊCH VỤ</th>
-                <th className="px-10 py-6 text-[10px] font-bold text-stone-400 uppercase tracking-widest">SỐ LƯỢNG</th>
-                <th className="px-10 py-6 text-[10px] font-bold text-stone-400 uppercase tracking-widest">DOANH THU</th>
-                <th className="px-10 py-6 text-[10px] font-bold text-stone-400 uppercase tracking-widest">% TĂNG TRƯỞNG</th>
+                <th className="px-10 py-6 text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                  {isServiceTab ? 'TÊN DỊCH VỤ' : 'NHÂN VIÊN'}
+                </th>
+                <th className="px-10 py-6 text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                  {isServiceTab ? 'SỐ LƯỢNG' : 'SỐ KHÁCH'}
+                </th>
+                <th className="px-10 py-6 text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                  {isServiceTab ? 'DOANH THU' : 'HIỆU SUẤT'}
+                </th>
+                <th className="px-10 py-6 text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                  {isServiceTab ? '% TĂNG TRƯỞNG' : 'ĐÁNH GIÁ'}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-50">
-              {serviceReports.map((item) => (
-                <tr key={item.id} className="hover:bg-stone-50/30 transition-colors group">
-                  <td className="px-10 py-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm">
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                      </div>
-                      <span className="text-sm font-bold text-primary">{item.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-10 py-6 text-sm font-bold text-stone-600">{item.quantity}</td>
-                  <td className="px-10 py-6 text-sm font-bold text-primary">{item.revenue} đ</td>
-                  <td className="px-10 py-6">
-                    <div className={cn(
-                      "inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold",
-                      item.growth > 0 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
-                    )}>
-                      {item.growth > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                      {Math.abs(item.growth)}%
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {isServiceTab
+                ? visibleRows.map((item: any) => (
+                    <tr key={item.id} className="hover:bg-stone-50/30 transition-colors group">
+                      <td className="px-10 py-6">
+                        <div className="flex items-center gap-4">
+                          {item.image ? (
+                            <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm">
+                              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-stone-100 text-primary flex items-center justify-center text-xs font-bold shadow-sm">
+                              {String(item.name || '?')
+                                .split(' ')
+                                .filter(Boolean)
+                                .slice(0, 2)
+                                .map((part: string) => part[0]?.toUpperCase() || '')
+                                .join('')}
+                            </div>
+                          )}
+                          <span className="text-sm font-bold text-primary">{item.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-10 py-6 text-sm font-bold text-stone-600">{item.quantity}</td>
+                      <td className="px-10 py-6 text-sm font-bold text-primary">{item.revenue} đ</td>
+                      <td className="px-10 py-6">
+                        <div
+                          className={cn(
+                            'inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold',
+                            item.growth > 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                          )}
+                        >
+                          {item.growth > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                          {Math.abs(item.growth)}%
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                : visibleRows.map((item: any, idx: number) => (
+                    <tr key={`${item.name}-${idx}`} className="hover:bg-stone-50/30 transition-colors group">
+                      <td className="px-10 py-6">
+                        <span className="text-sm font-bold text-primary">{item.name}</span>
+                      </td>
+                      <td className="px-10 py-6 text-sm font-bold text-stone-600">{item.customers}</td>
+                      <td className="px-10 py-6">
+                        <div className="w-36 h-2 bg-stone-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${item.value}%` }} />
+                        </div>
+                      </td>
+                      <td className="px-10 py-6">
+                        <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-600">
+                          <TrendingUp size={12} />
+                          {item.value}%
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>
 
         <div className="p-8 text-center border-t border-stone-50">
-          <button className="text-[10px] font-bold text-stone-400 uppercase tracking-widest hover:text-primary transition-colors flex items-center gap-2 mx-auto">
-            XEM TẤT CẢ BÁO CÁO CHI TIẾT <ChevronRight size={14} />
-          </button>
+          {hasMoreRows ? (
+            <button
+              onClick={() => setShowAllRows((prev) => !prev)}
+              className="text-[10px] font-bold text-stone-400 uppercase tracking-widest hover:text-primary transition-colors flex items-center gap-2 mx-auto"
+            >
+              {showAllRows ? 'THU GỌN BÁO CÁO' : 'XEM TẤT CẢ BÁO CÁO CHI TIẾT'} <ChevronRight size={14} />
+            </button>
+          ) : (
+            <p className="text-[10px] font-bold text-stone-300 uppercase tracking-widest">Đã hiển thị toàn bộ dữ liệu</p>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[3rem] shadow-sm border border-stone-100 overflow-hidden">
+        <div className="p-8 border-b border-stone-50">
+          <h3 className="text-xl font-serif text-primary">Đơn hàng hôm nay</h3>
+          <p className="text-xs text-stone-400 mt-1">Xem hôm nay bán gì, đã làm gì và ai thực hiện.</p>
+        </div>
+        <div className="max-h-[360px] overflow-y-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-stone-50/50">
+                <th className="px-8 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Giờ</th>
+                <th className="px-8 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Đã bán / đã làm</th>
+                <th className="px-8 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Ai làm</th>
+                <th className="px-8 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Tổng tiền</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-50">
+              {todayOrderDetails.map((o) => (
+                <tr key={o.id} className="hover:bg-stone-50/30 transition-colors">
+                  <td className="px-8 py-4 text-sm font-bold text-stone-500">{o.time}</td>
+                  <td className="px-8 py-4 text-sm font-medium text-primary">{o.soldItems}</td>
+                  <td className="px-8 py-4 text-sm font-bold text-stone-600">{o.doneBy}</td>
+                  <td className="px-8 py-4 text-sm font-bold text-primary">{o.total} đ</td>
+                </tr>
+              ))}
+              {!todayOrderDetails.length && (
+                <tr>
+                  <td colSpan={4} className="px-8 py-8 text-sm text-stone-400 text-center">
+                    Hôm nay chưa có đơn hàng.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </motion.div>

@@ -1,20 +1,6 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Search, 
-  Plus, 
-  Filter, 
-  Clock, 
-  Tag, 
-  ChevronRight, 
-  Star,
-  Scissors,
-  Droplets,
-  Sparkles,
-  MoreVertical,
-  Edit3,
-  Trash2
-} from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { motion } from 'motion/react';
+import { Search, Plus, Filter, Clock, Tag, ChevronDown, ChevronLeft, ChevronRight, Edit2, Trash2, LayoutGrid, List } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Service } from '../../types';
 
@@ -44,28 +30,49 @@ export function ServicesView({
   onDeleteService,
   onViewService,
 }: ServicesViewProps) {
-  const [activeCategory, setActiveCategory] = useState<string>("Tất cả");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>('Tất cả danh mục');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
   const [failedImages, setFailedImages] = useState<Record<string, true>>({});
 
   const categories = [
-    "Tất cả",
+    'Tất cả danh mục',
     ...Array.from(new Set([...serviceCategories, ...services.map((s) => s.category)])).sort((a, b) => a.localeCompare(b, 'vi')),
   ];
   
-  const filteredServices = services.filter(service => {
-    const matchesCategory = activeCategory === "Tất cả" || service.category === activeCategory;
-    const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredServices = useMemo(() => {
+    return services.filter((service) => {
+      const matchesCategory = activeCategory === 'Tất cả danh mục' || service.category === activeCategory;
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return matchesCategory;
+      const matchesSearch =
+        service.name.toLowerCase().includes(q) ||
+        service.category.toLowerCase().includes(q) ||
+        service.duration.toLowerCase().includes(q) ||
+        String(service.tags || [])
+          .toLowerCase()
+          .includes(q);
+      return matchesCategory && matchesSearch;
+    });
+  }, [services, activeCategory, searchQuery]);
 
-  const getIcon = (categoryName: string) => {
-    switch (categoryName) {
-      case "Cắt & Tạo Kiểu": return <Scissors size={18} />;
-      case "Hóa Chất": return <Droplets size={18} />;
-      case "Phục Hồi": return <Sparkles size={18} />;
-      default: return <Tag size={18} />;
-    }
+  const totalPages = Math.max(1, Math.ceil(filteredServices.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedServices = filteredServices.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pageStart = Math.max(1, safePage - 1);
+  const pageEnd = Math.min(totalPages, pageStart + 2);
+  const visiblePages = Array.from({ length: pageEnd - pageStart + 1 }, (_, i) => pageStart + i);
+
+  const handleCategoryChange = (next: string) => {
+    setActiveCategory(next);
+    setPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
   };
 
   return (
@@ -73,180 +80,248 @@ export function ServicesView({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="p-10 space-y-10"
+      className="p-8 space-y-8 max-w-[1600px] mx-auto"
     >
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex justify-between items-end">
-        <div>
-          <h2 className="text-4xl font-serif text-primary mb-2">Dịch vụ & Bảng giá</h2>
-          <p className="text-stone-500">Quản lý danh mục dịch vụ và thiết lập giá chuyên nghiệp</p>
+        <div className="space-y-4">
+          <h2 className="text-4xl font-serif text-primary leading-tight">Dịch vụ & Bảng giá</h2>
+          <p className="text-stone-500 max-w-xl text-sm leading-relaxed">
+            Quản lý danh mục dịch vụ theo dạng danh sách giống trang sản phẩm
+          </p>
         </div>
-        <button 
+        <button
           onClick={onNewService}
-          className="bg-primary text-white px-8 py-4 rounded-xl text-sm font-bold flex items-center gap-2 shadow-xl hover:bg-primary-light transition-all active:scale-95"
+          className="bg-primary text-white px-8 py-4 rounded-2xl text-sm font-bold shadow-xl hover:bg-primary-light transition-all flex items-center gap-3 active:scale-95"
         >
-          <Plus size={18} />
-          Thêm dịch vụ mới
+          <Plus size={20} />
+          Thêm dịch vụ
         </button>
       </div>
 
-      {/* Categories & Filters */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-stone-100 overflow-x-auto max-w-full">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={cn(
-                "px-6 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2",
-                activeCategory === cat 
-                  ? "bg-primary text-white shadow-md" 
-                  : "text-stone-400 hover:text-primary hover:bg-stone-50"
-              )}
-            >
-              {cat !== "Tất cả" && getIcon(cat)}
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-4 w-full md:w-auto">
-          <div className="relative flex-1 md:w-80">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-            <input 
-              type="text" 
-              placeholder="Tìm tên dịch vụ..." 
+      {/* Filters */}
+      <div className="bg-stone-50/50 p-6 rounded-[2.5rem] flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+            <input
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white border border-stone-100 rounded-xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-primary/10 transition-all"
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Tìm theo tên, danh mục, thời lượng..."
+              className="bg-white border-none rounded-2xl pl-11 pr-4 py-3.5 text-sm font-medium text-primary outline-none focus:ring-2 ring-primary/5 shadow-sm min-w-[300px]"
             />
           </div>
-          <button className="flex items-center gap-2 px-6 py-3 bg-stone-100 text-stone-600 rounded-xl text-xs font-bold hover:bg-stone-200 transition-colors">
-            <Filter size={16} /> Lọc
+          <div className="relative">
+            <select
+              value={activeCategory}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="bg-white border-none rounded-2xl px-8 py-3.5 pr-12 text-sm font-medium text-primary appearance-none cursor-pointer focus:ring-2 ring-primary/5 outline-none shadow-sm min-w-[240px]"
+            >
+              {categories.map((cat) => (
+                <option key={cat}>{cat}</option>
+              ))}
+            </select>
+            <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+          </div>
+          <button className="bg-white px-6 py-3.5 rounded-2xl text-sm font-medium text-primary flex items-center gap-3 shadow-sm hover:bg-stone-50 transition-all">
+            <Filter size={18} className="text-stone-400" />
+            Bộ lọc
+            <div className="w-5 h-5 bg-stone-100 rounded-lg flex items-center justify-center text-[10px] font-bold">1</div>
+          </button>
+        </div>
+        <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-sm">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={cn(
+              'p-2.5 rounded-xl transition-all',
+              viewMode === 'grid' ? 'bg-primary text-white shadow-md' : 'text-stone-400 hover:text-primary'
+            )}
+          >
+            <LayoutGrid size={20} />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={cn(
+              'p-2.5 rounded-xl transition-all',
+              viewMode === 'list' ? 'bg-primary text-white shadow-md' : 'text-stone-400 hover:text-primary'
+            )}
+          >
+            <List size={20} />
           </button>
         </div>
       </div>
 
-      {/* Services Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <AnimatePresence mode="popLayout">
-          {filteredServices.map((service) => (
-            <motion.div 
+      {viewMode === 'list' ? (
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-stone-100 overflow-hidden">
+          <div className="max-h-[680px] overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-stone-100 bg-stone-50/50">
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Dịch vụ</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Danh mục</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Thời lượng</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Giá</th>
+                  <th className="px-6 py-5 text-[10px] font-bold text-stone-400 uppercase tracking-widest text-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedServices.map((service) => (
+                  <tr key={service.id} className="border-b border-stone-50 hover:bg-stone-50/40 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {service.image && !failedImages[String(service.id)] ? (
+                          <img
+                            src={service.image}
+                            alt={service.name}
+                            onError={() => setFailedImages((prev) => ({ ...prev, [String(service.id)]: true }))}
+                            className="w-12 h-12 rounded-xl object-cover border border-stone-100"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-stone-100 border border-stone-100 flex items-center justify-center">
+                            <span className="text-sm font-serif text-primary">{getInitials(service.name)}</span>
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-primary truncate">{service.name}</p>
+                          <p className="text-[10px] text-stone-400 truncate">{service.description || '—'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="bg-stone-100 text-stone-500 px-3 py-1 rounded-lg text-[10px] font-bold uppercase">{service.category}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 text-stone-500 text-xs font-bold">
+                        <Clock size={14} />
+                        {service.duration}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1 text-primary text-sm font-bold">
+                        <Tag size={14} />
+                        {service.price}đ
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => onEditService(service)}
+                          className="p-2 rounded-lg border border-stone-100 text-stone-500 hover:text-primary hover:bg-white"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => onViewService(service)}
+                          className="px-3 py-2 rounded-lg bg-stone-100 text-[11px] font-bold text-primary hover:bg-stone-200"
+                        >
+                          Chi tiết
+                        </button>
+                        <button
+                          onClick={() => onDeleteService(service)}
+                          className="p-2 rounded-lg border border-red-100 text-red-500 hover:bg-red-50"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {paginatedServices.map((service) => (
+            <motion.div
               key={service.id}
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              whileHover={{ y: -10 }}
-              className="bg-white rounded-[2.5rem] shadow-sm border border-stone-100 overflow-hidden group flex flex-col"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-[2rem] border border-stone-100 p-6 shadow-sm hover:shadow-md transition-all"
             >
-              <div className="relative h-56 overflow-hidden">
+              <div className="flex items-start gap-4">
                 {service.image && !failedImages[String(service.id)] ? (
-                  <img 
-                    src={service.image} 
-                    alt={service.name} 
+                  <img
+                    src={service.image}
+                    alt={service.name}
                     onError={() => setFailedImages((prev) => ({ ...prev, [String(service.id)]: true }))}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                    className="w-16 h-16 rounded-2xl object-cover border border-stone-100"
                   />
                 ) : (
-                  <div className="w-full h-full bg-stone-100 flex items-center justify-center">
-                    <div className="w-20 h-20 rounded-3xl bg-white flex items-center justify-center shadow-sm border border-stone-100">
-                      <span className="text-4xl font-serif text-primary">{getInitials(service.name)}</span>
-                    </div>
+                  <div className="w-16 h-16 rounded-2xl bg-stone-100 border border-stone-100 flex items-center justify-center">
+                    <span className="text-lg font-serif text-primary">{getInitials(service.name)}</span>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                  <p className="text-white text-xs leading-relaxed line-clamp-2">
-                    {service.description}
-                  </p>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">{service.category}</p>
+                  <h4 className="text-lg font-serif text-primary truncate">{service.name}</h4>
+                  <p className="text-xs text-stone-400 line-clamp-2">{service.description || '—'}</p>
                 </div>
-                <div className="absolute top-4 right-4 flex gap-2">
-                  <button 
-                    onClick={() => onEditService(service)}
-                    className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center text-white hover:bg-white/40 transition-all"
-                  >
-                    <Edit3 size={14} />
-                  </button>
-                  <button 
-                    onClick={() => onDeleteService(service)}
-                    className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center text-white hover:bg-red-500/40 transition-all"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                {service.popularity && service.popularity > 90 && (
-                  <div className="absolute top-4 left-4 bg-secondary text-white px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 shadow-lg">
-                    <Star size={10} fill="currentColor" /> PHỔ BIẾN
-                  </div>
-                )}
               </div>
-
-              <div className="p-8 flex-1 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-secondary uppercase tracking-widest">{service.category}</p>
-                      <h4 className="text-xl font-serif text-primary leading-tight">{service.name}</h4>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-6 pt-2">
-                    <div className="flex items-center gap-2 text-stone-400">
-                      <Clock size={16} />
-                      <span className="text-xs font-bold">{service.duration}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-stone-400">
-                      <Tag size={16} />
-                      <span className="text-xs font-bold">{service.price}₫</span>
-                    </div>
-                  </div>
+              <div className="mt-5 flex items-center justify-between">
+                <div className="text-xs text-stone-500 font-bold flex items-center gap-2">
+                  <Clock size={14} />
+                  {service.duration}
                 </div>
-
-                <div className="pt-8 flex items-center justify-between">
-                  <div className="flex -space-x-2">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-stone-100 flex items-center justify-center overflow-hidden">
-                        <img src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="stylist" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                    <div className="w-8 h-8 rounded-full border-2 border-white bg-stone-50 flex items-center justify-center text-[8px] font-bold text-stone-400">+5</div>
-                  </div>
-                  <button
-                    onClick={() => onViewService(service)}
-                    className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-2 group-hover:text-secondary transition-colors"
-                  >
-                    Chi tiết <ChevronRight size={14} />
-                  </button>
-                </div>
+                <div className="text-sm text-primary font-bold">{service.price}đ</div>
+              </div>
+              <div className="mt-5 grid grid-cols-3 gap-2">
+                <button onClick={() => onEditService(service)} className="py-2 rounded-xl border border-stone-100 text-xs font-bold text-stone-600 hover:bg-stone-50">
+                  Sửa
+                </button>
+                <button onClick={() => onViewService(service)} className="py-2 rounded-xl bg-stone-100 text-xs font-bold text-primary hover:bg-stone-200">
+                  Chi tiết
+                </button>
+                <button onClick={() => onDeleteService(service)} className="py-2 rounded-xl border border-red-100 text-xs font-bold text-red-500 hover:bg-red-50">
+                  Xóa
+                </button>
               </div>
             </motion.div>
           ))}
-        </AnimatePresence>
-      </div>
-
-      {/* Pricing Policy / Info */}
-      <div className="bg-primary p-12 rounded-[3rem] text-white flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
-        <div className="relative z-10 space-y-4 max-w-xl">
-          <h3 className="text-3xl font-serif">Chính sách giá & Ưu đãi</h3>
-          <p className="text-white/70 text-sm leading-relaxed">
-            Tất cả dịch vụ tại Atelier Salon đều bao gồm gội đầu thư giãn và sấy tạo kiểu cơ bản. Khách hàng VIP được giảm 10-20% tùy hạng thẻ thành viên.
-          </p>
-          <div className="flex gap-4 pt-2">
-            <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
-              <Star size={16} className="text-secondary" fill="currentColor" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Giảm 10% cho lần đầu</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
-              <Tag size={16} className="text-secondary" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Combo tiết kiệm 15%</span>
-            </div>
-          </div>
         </div>
-        <button className="relative z-10 bg-white text-primary px-10 py-5 rounded-2xl text-sm font-bold shadow-2xl hover:bg-stone-100 transition-all active:scale-95 shrink-0">
-          Tải bảng giá PDF
-        </button>
-        <div className="absolute -right-20 -bottom-20 opacity-10">
-          <Scissors size={300} />
+      )}
+
+      {!filteredServices.length && (
+        <div className="bg-white border border-stone-100 rounded-[2rem] p-10 text-center">
+          <p className="text-primary font-bold">Không tìm thấy dịch vụ phù hợp.</p>
+          <p className="text-stone-400 text-sm mt-2">Thử đổi từ khóa hoặc danh mục để xem thêm kết quả.</p>
+        </div>
+      )}
+
+      {/* Pagination */}
+      <div className="flex justify-between items-center pt-8 border-t border-stone-100">
+        <p className="text-xs font-medium text-stone-400">
+          Hiển thị {paginatedServices.length} trong trang {safePage} / {totalPages} - tổng {filteredServices.length} dịch vụ
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            disabled={safePage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="w-11 h-11 rounded-2xl border border-stone-100 bg-white flex items-center justify-center text-stone-400 hover:bg-stone-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          {visiblePages.map((p) => (
+            <button
+              key={p}
+              onClick={() => setPage(p)}
+              className={cn(
+                'w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-bold transition-all',
+                p === safePage
+                  ? 'bg-primary text-white shadow-lg'
+                  : 'bg-white border border-stone-100 text-stone-500 hover:bg-stone-50'
+              )}
+            >
+              {p}
+            </button>
+          ))}
+          <button
+            disabled={safePage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            className="w-11 h-11 rounded-2xl border border-stone-100 bg-white flex items-center justify-center text-stone-400 hover:bg-stone-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
       </div>
     </motion.div>
