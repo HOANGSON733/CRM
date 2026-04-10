@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { 
   Search, 
   Plus, 
@@ -12,7 +12,6 @@ import {
   CheckCircle2, 
   PlayCircle, 
   Calendar as CalendarIcon,
-  Users
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -36,7 +35,7 @@ interface CustomersViewProps {
 
 export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: CustomersViewProps) {
   const [filterType, setFilterType] = useState<'all' | 'member' | 'walkin'>('all');
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(customers[0] || null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const filteredCustomers = customers.filter((customer) => {
     if (filterType === 'member') return !customer.isWalkIn;
     if (filterType === 'walkin') return Boolean(customer.isWalkIn);
@@ -50,11 +49,47 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
     }
 
     setSelectedCustomer((prev: any) => {
-      if (!prev) return filteredCustomers[0];
+      if (!prev) return null;
       const matched = filteredCustomers.find((item) => item.id === prev.id);
-      return matched || filteredCustomers[0];
+      return matched || null;
     });
   }, [filteredCustomers]);
+
+  const spendingChartData = React.useMemo(() => {
+    if (!selectedCustomer) return [];
+    const existing = Array.isArray(selectedCustomer.spendingData) ? selectedCustomer.spendingData : [];
+    if (existing.length) return existing;
+
+    const now = new Date();
+    const buckets: { key: string; month: string; value: number }[] = [];
+    for (let i = 5; i >= 0; i -= 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        month: `T${d.getMonth() + 1}`,
+        value: 0,
+      });
+    }
+    const bucketIndex = new Map(buckets.map((b, idx) => [b.key, idx]));
+
+    const history = Array.isArray(selectedCustomer.history) ? selectedCustomer.history : [];
+    history.forEach((visit: any) => {
+      const dateRaw = String(visit?.date || '').trim();
+      const [dd, mm, yyyy] = dateRaw.split('/');
+      const month = Number(mm);
+      const year = Number(yyyy);
+      if (!Number.isFinite(month) || !Number.isFinite(year)) return;
+      const key = `${year}-${String(month).padStart(2, '0')}`;
+      const idx = bucketIndex.get(key);
+      if (idx === undefined) return;
+      const priceRaw = String(visit?.price || '').replace(/[^\d]/g, '');
+      const price = Number(priceRaw);
+      if (!Number.isFinite(price)) return;
+      buckets[idx].value += price;
+    });
+
+    return buckets.map(({ month, value }) => ({ month, value }));
+  }, [selectedCustomer]);
 
   return (
     <motion.div 
@@ -84,9 +119,9 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
         <KPICard title="Giá trị TB/Khách" value="1.450.000₫" color="secondary-light" />
       </div>
 
-      <div className="flex gap-8">
+      <div className="relative">
         {/* Customer Table Section */}
-        <div className="flex-1 bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden flex flex-col">
+        <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden flex flex-col">
           <div className="p-8 border-b border-stone-100 flex justify-between items-center bg-stone-50/30">
             <div className="relative w-96">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -150,9 +185,8 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
                 {filteredCustomers.map((customer) => (
                   <tr 
                     key={customer.id} 
-                    onClick={() => setSelectedCustomer(customer)}
                     className={cn(
-                      "group cursor-pointer transition-colors",
+                      "group transition-colors",
                       selectedCustomer?.id === customer.id ? "bg-secondary/5" : "hover:bg-stone-50"
                     )}
                   >
@@ -177,7 +211,10 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
                       <p className="text-xs font-medium text-stone-600">{customer.lastVisit}</p>
                     </td>
                     <td className="px-8 py-5 text-right">
-                      <button className="p-2 text-stone-300 hover:text-secondary transition-colors">
+                      <button
+                        onClick={() => setSelectedCustomer(customer)}
+                        className="p-2 text-stone-300 hover:text-secondary transition-colors"
+                      >
                         <ChevronDown size={20} className="-rotate-90" />
                       </button>
                     </td>
@@ -189,13 +226,23 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
         </div>
 
         {/* Customer Detail Side Panel */}
-        <div className="w-[450px] space-y-6">
+        <AnimatePresence>
           {selectedCustomer ? (
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-white rounded-[2.5rem] shadow-xl border border-stone-100 overflow-hidden flex flex-col h-full"
-            >
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSelectedCustomer(null)}
+                className="absolute inset-0 z-10 bg-black/10"
+              />
+              <motion.div
+                initial={{ opacity: 0, x: 60 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 60 }}
+                transition={{ type: 'tween', duration: 0.2 }}
+                className="absolute top-0 right-0 z-20 w-[450px] h-full bg-white rounded-[2.5rem] shadow-xl border border-stone-100 overflow-hidden flex flex-col"
+              >
               <div className="p-8 flex-1 overflow-y-auto space-y-8">
                 <div className="flex justify-between items-start">
                   <div className="flex gap-2">
@@ -264,7 +311,7 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
                   </div>
                   <div className="h-40 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={selectedCustomer.spendingData || []}>
+                      <BarChart data={spendingChartData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                         <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 8, fontWeight: 700 }} />
                         <YAxis hide />
@@ -307,19 +354,10 @@ export function CustomersView({ customers, onNewCustomer, onDeleteCustomer }: Cu
                   <PlayCircle size={18} /> Xem ghi chú kỹ thuật (Color Formula)
                 </button>
               </div>
-            </motion.div>
-          ) : (
-            <div className="h-full bg-stone-50 rounded-[2.5rem] border-2 border-dashed border-stone-200 flex flex-col items-center justify-center p-10 text-center space-y-4">
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-stone-200 shadow-sm">
-                <Users size={40} />
-              </div>
-              <div>
-                <h4 className="text-lg font-serif text-stone-400">Chưa chọn khách hàng</h4>
-                <p className="text-sm text-stone-400">Chọn một khách hàng từ danh sách để xem chi tiết hồ sơ</p>
-              </div>
-            </div>
-          )}
-        </div>
+              </motion.div>
+            </>
+          ) : null}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

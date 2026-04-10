@@ -7,6 +7,46 @@ function formatDateVi(date: Date) {
   return new Intl.DateTimeFormat('vi-VN').format(date);
 }
 
+function getLast6MonthBuckets(now: Date) {
+  const months: { key: string; month: string }[] = [];
+  for (let i = 5; i >= 0; i -= 1) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months.push({ key, month: `T${d.getMonth() + 1}` });
+  }
+  return months;
+}
+
+function buildUpdatedSpendingData(
+  existing: Array<{ month?: string; value?: number }> | undefined,
+  amountToAdd: number,
+  now: Date
+) {
+  const buckets = getLast6MonthBuckets(now);
+  const keyByLabel = new Map<string, string>();
+  const valuesByKey = new Map<string, number>();
+
+  buckets.forEach((bucket) => {
+    keyByLabel.set(bucket.month, bucket.key);
+    valuesByKey.set(bucket.key, 0);
+  });
+
+  (existing || []).forEach((item) => {
+    const key = keyByLabel.get(String(item?.month || '').trim());
+    if (!key) return;
+    const value = Number(item?.value || 0);
+    valuesByKey.set(key, Number.isFinite(value) ? value : 0);
+  });
+
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  valuesByKey.set(currentKey, (valuesByKey.get(currentKey) || 0) + Math.round(amountToAdd));
+
+  return buckets.map((bucket) => ({
+    month: bucket.month,
+    value: valuesByKey.get(bucket.key) || 0,
+  }));
+}
+
 async function requireAuth(req: Request, res: Response) {
   const token = getTokenFromHeader(req.headers.authorization);
   if (!token) {
@@ -137,6 +177,7 @@ export async function checkoutPosOrder(req: Request, res: Response) {
     let updatedCustomer: any = null;
     if (!isWalkIn && customerIdRaw && ObjectId.isValid(customerIdRaw)) {
       const customerId = new ObjectId(customerIdRaw);
+      const currentCustomer = await currentDb().collection('customers').findOne({ _id: customerId });
       const pointsEarned = Math.max(0, Math.floor(total / 10000)); // same rule as POS UI (demo)
       const servicesSummary = items
         .map((i) => `${i.name}${i.quantity > 1 ? ` x${i.quantity}` : ''}`)
@@ -160,6 +201,11 @@ export async function checkoutPosOrder(req: Request, res: Response) {
           $set: {
             lastVisit: formatDateVi(now),
             updatedAt: now,
+            spendingData: buildUpdatedSpendingData(
+              Array.isArray(currentCustomer?.spendingData) ? currentCustomer.spendingData : [],
+              total,
+              now
+            ),
           },
           $inc: { points: pointsEarned },
           $push: { history: { $each: [historyItem], $position: 0 } },

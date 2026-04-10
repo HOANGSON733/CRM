@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { 
   X, 
   Search, 
@@ -7,7 +7,9 @@ import {
   CheckCircle2, 
   Users, 
   ChevronLeft, 
-  ChevronRight 
+  ChevronRight,
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Employee, Service } from '../../types';
@@ -19,19 +21,151 @@ interface NewAppointmentModalProps {
   employees: Employee[];
 }
 
-export function NewAppointmentModal({ onClose, services, employees }: NewAppointmentModalProps) {
+export function NewAppointmentModal({ onClose, authToken, services, employees }: NewAppointmentModalProps) {
+  const now = new Date();
+  const [viewMonthDate, setViewMonthDate] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
   const [selectedService, setSelectedService] = useState<string>(() => String(services[0]?.id || ''));
   const [selectedStylist, setSelectedStylist] = useState<string>(() => String(employees[0]?.id || 'any'));
   const [selectedTime, setSelectedTime] = useState('11:00');
+  const [selectedDate, setSelectedDate] = useState<Date>(now);
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [notes, setNotes] = useState('');
   const [smsReminder, setSmsReminder] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
-  const timeSlots = [
-    '09:00', '09:30', '10:00', '10:30',
-    '11:00', '11:30', '13:30', '14:00',
-    '14:30', '15:00', '15:30', '16:00'
-  ];
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    for (let hour = 8; hour <= 22; hour += 1) {
+      slots.push(`${String(hour).padStart(2, '0')}:00`);
+      if (hour < 22) slots.push(`${String(hour).padStart(2, '0')}:30`);
+    }
+    return slots;
+  }, []);
 
   const selectedServiceObj = services.find((s) => String(s.id) === String(selectedService));
+  const selectedStylistObj = employees.find((e) => String(e.id) === String(selectedStylist));
+  const selectedDateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+  const disabledSlots = useMemo(() => new Set(bookedSlots), [bookedSlots]);
+  const currentMonthYear = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(viewMonthDate);
+
+  const calendarDays = useMemo(() => {
+    const year = viewMonthDate.getFullYear();
+    const month = viewMonthDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const leadingDays = (firstDay.getDay() + 6) % 7; // Monday first
+    const totalDays = lastDay.getDate();
+    const cells: Date[] = [];
+
+    for (let i = leadingDays; i > 0; i -= 1) {
+      cells.push(new Date(year, month, 1 - i));
+    }
+    for (let day = 1; day <= totalDays; day += 1) {
+      cells.push(new Date(year, month, day));
+    }
+    while (cells.length % 7 !== 0) {
+      const nextDay = cells.length - (leadingDays + totalDays) + 1;
+      cells.push(new Date(year, month + 1, nextDay));
+    }
+    return cells;
+  }, [viewMonthDate]);
+
+  useEffect(() => {
+    if (!authToken) {
+      setBookedSlots([]);
+      return;
+    }
+
+    let cancelled = false;
+    const loadBookedSlots = async () => {
+      try {
+        const response = await fetch(`/api/appointments?date=${selectedDateKey}`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
+          throw new Error(data?.message || 'Không thể tải lịch hẹn theo ngày.');
+        }
+
+        const data = await response.json();
+        const appointments = Array.isArray(data?.appointments) ? data.appointments : [];
+        const occupiedTimes = appointments
+          .filter((item: any) => {
+            if (!selectedStylist || selectedStylist === 'any') return true;
+            return String(item?.stylistId || '') === String(selectedStylist);
+          })
+          .map((item: any) => String(item?.time || '').trim())
+          .filter(Boolean);
+
+        if (!cancelled) setBookedSlots(occupiedTimes);
+      } catch (_error) {
+        if (!cancelled) setBookedSlots([]);
+      }
+    };
+
+    loadBookedSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken, selectedDateKey, selectedStylist]);
+
+  const handleConfirmAppointment = async () => {
+    if (!authToken) {
+      setError('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+      return;
+    }
+    if (!selectedServiceObj) {
+      setError('Vui lòng chọn dịch vụ trước khi xác nhận lịch hẹn.');
+      return;
+    }
+    if (disabledSlots.has(selectedTime)) {
+      setError('Khung giờ này đang bận, vui lòng chọn giờ khác.');
+      return;
+    }
+
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          customerName: customerQuery.trim() || 'Khách đặt lịch',
+          customerPhone: '',
+          serviceName: selectedServiceObj.name,
+          serviceId: String(selectedServiceObj.id),
+          stylistName: selectedStylistObj?.name || 'Bất kỳ',
+          stylistId: selectedStylist === 'any' ? '' : selectedStylist,
+          date: selectedDateKey,
+          time: selectedTime,
+          durationMinutes: Number((selectedServiceObj.duration || '').match(/\d+/)?.[0] || 60),
+          notes: notes.trim(),
+          smsReminder,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message || 'Không thể đặt lịch hẹn.');
+      }
+      window.dispatchEvent(new Event('appointments:changed'));
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        onClose();
+      }, 1200);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Không thể đặt lịch hẹn.';
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -70,6 +204,8 @@ export function NewAppointmentModal({ onClose, services, employees }: NewAppoint
               <input 
                 type="text" 
                 placeholder="Tìm theo tên hoặc số điện thoại..." 
+                value={customerQuery}
+                onChange={(e) => setCustomerQuery(e.target.value)}
                 className="w-full bg-stone-50 border border-stone-100 rounded-2xl py-4 pl-12 pr-4 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
               />
             </div>
@@ -162,45 +298,75 @@ export function NewAppointmentModal({ onClose, services, employees }: NewAppoint
               {/* Mini Calendar */}
               <div className="bg-stone-50 p-6 rounded-2xl w-64">
                 <div className="flex justify-between items-center mb-4">
-                  <h6 className="text-xs font-bold text-primary">Tháng 10, 2023</h6>
+                  <h6 className="text-xs font-bold text-primary">{currentMonthYear}</h6>
                   <div className="flex gap-1">
-                    <button className="p-1 text-stone-400 hover:text-stone-600"><ChevronLeft size={14} /></button>
-                    <button className="p-1 text-stone-400 hover:text-stone-600"><ChevronRight size={14} /></button>
+                    <button
+                      onClick={() => setViewMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                      className="p-1 text-stone-400 hover:text-stone-600"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button
+                      onClick={() => setViewMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                      className="p-1 text-stone-400 hover:text-stone-600"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
                 </div>
                 <div className="grid grid-cols-7 text-center text-[9px] font-bold text-stone-400 mb-3">
                   <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
                 </div>
                 <div className="grid grid-cols-7 gap-y-2 text-center text-[11px]">
-                  {[28, 29, 30, 1, 2, 3, 4].map((d, i) => (
+                  {calendarDays.map((day, i) => {
+                    const isInCurrentMonth = day.getMonth() === viewMonthDate.getMonth();
+                    const isSelected =
+                      day.getDate() === selectedDate.getDate() &&
+                      day.getMonth() === selectedDate.getMonth() &&
+                      day.getFullYear() === selectedDate.getFullYear();
+                    return (
                     <button 
                       key={i} 
+                      onClick={() => {
+                        setSelectedDate(day);
+                        if (!isInCurrentMonth) {
+                          setViewMonthDate(new Date(day.getFullYear(), day.getMonth(), 1));
+                        }
+                      }}
                       className={cn(
                         "w-7 h-7 flex items-center justify-center rounded-lg mx-auto transition-all",
-                        d === 3 ? "bg-primary text-white shadow-md" : (d < 5 ? "text-stone-700 hover:bg-stone-200" : "text-stone-300")
+                        isSelected ? "bg-primary text-white shadow-md" : "hover:bg-stone-200",
+                        isInCurrentMonth ? "text-stone-700" : "text-stone-300"
                       )}
                     >
-                      {d}
+                      {day.getDate()}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Time Slots */}
               <div className="flex-1 grid grid-cols-4 gap-3">
                 {timeSlots.map((t) => (
+                  (() => {
+                    const isDisabled = disabledSlots.has(t);
+                    return (
                   <button 
                     key={t}
-                    onClick={() => setSelectedTime(t)}
+                    onClick={() => !isDisabled && setSelectedTime(t)}
+                    disabled={isDisabled}
                     className={cn(
                       "py-3.5 rounded-xl text-sm font-bold transition-all border-2",
                       selectedTime === t 
                         ? "bg-primary text-white border-primary shadow-md" 
-                        : (t === '14:30' ? "bg-stone-100 text-stone-300 border-stone-100 cursor-not-allowed" : "bg-white text-stone-700 border-stone-50 hover:border-stone-200")
+                        : (isDisabled ? "bg-stone-100 text-stone-300 border-stone-100 cursor-not-allowed" : "bg-white text-stone-700 border-stone-50 hover:border-stone-200")
                     )}
                   >
                     {t}
                   </button>
+                    );
+                  })()
                 ))}
               </div>
             </div>
@@ -212,6 +378,8 @@ export function NewAppointmentModal({ onClose, services, employees }: NewAppoint
               <label className="text-[11px] font-bold text-stone-400 uppercase tracking-widest">GHI CHÚ ĐẶC BIỆT</label>
               <textarea 
                 placeholder="Yêu cầu riêng của khách, công thức màu nhuộm..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 className="w-full bg-stone-50 border border-stone-100 rounded-2xl p-4 text-sm h-24 focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all resize-none"
               />
             </div>
@@ -260,19 +428,65 @@ export function NewAppointmentModal({ onClose, services, employees }: NewAppoint
               <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỔNG CHI PHÍ</p>
               <p className="text-sm font-bold text-secondary">{selectedServiceObj?.price ? `${selectedServiceObj.price}₫` : '—'}</p>
             </div>
+            <div className="w-px h-8 bg-stone-200" />
+            <div>
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">LỊCH ĐẶT</p>
+              <p className="text-sm font-bold text-primary flex items-center gap-2">
+                <Calendar size={14} />
+                {selectedDate.getDate()}/{selectedDate.getMonth() + 1}/{selectedDate.getFullYear()}
+                <Clock size={14} className="ml-2" />
+                {selectedTime}
+              </p>
+            </div>
           </div>
           <div className="flex gap-4">
             <button 
               onClick={onClose}
+              disabled={isSubmitting}
               className="px-8 py-4 text-sm font-bold text-stone-400 hover:text-stone-600 transition-colors"
             >
               Hủy bỏ
             </button>
-            <button className="px-10 py-4 bg-primary text-white rounded-2xl text-sm font-bold shadow-xl hover:bg-primary-light transition-all active:scale-95">
-              Xác nhận đặt lịch
+            <button
+              onClick={handleConfirmAppointment}
+              disabled={isSubmitting}
+              className={cn(
+                "px-10 py-4 rounded-2xl text-sm font-bold shadow-xl transition-all active:scale-95",
+                isSubmitting ? "bg-stone-300 text-stone-600 cursor-not-allowed shadow-none" : "bg-primary text-white hover:bg-primary-light"
+              )}
+            >
+              {isSubmitting ? 'Đang xác nhận...' : 'Xác nhận đặt lịch'}
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="px-10 pb-8 -mt-6">
+            <p className="text-xs font-bold text-red-500">{error}</p>
+          </div>
+        )}
+
+        <AnimatePresence>
+          {showSuccess && (
+            <motion.div
+              initial={{ opacity: 0, x: 50, y: -40 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="absolute top-8 right-8 bg-white shadow-2xl rounded-2xl p-6 flex items-center gap-4 border border-green-100 z-[210]"
+            >
+              <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center text-green-500">
+                <CheckCircle2 size={28} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-primary">Thành công</p>
+                <p className="text-xs text-stone-500">Đã xác nhận đặt lịch hẹn thành công.</p>
+              </div>
+              <button onClick={() => setShowSuccess(false)} className="ml-4 text-stone-300 hover:text-stone-500">
+                <X size={16} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );
