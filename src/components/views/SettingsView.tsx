@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -24,15 +24,18 @@ import {
   FileText,
   History,
   Shield,
-  BarChart3
+  BarChart3,
+  X
 } from 'lucide-react';
 import { NewCategoryModal } from '../modals/NewCategoryModal';
 import { EditServiceCategoryModal } from '../modals/EditServiceCategoryModal';
 import { DeleteServiceCategoryModal } from '../modals/DeleteServiceCategoryModal';
+import { DeleteCustomerSourceModal } from '../modals/DeleteCustomerSourceModal';
 import { cn } from '../../lib/utils';
 import { Product, ProductCategoryConfig, Service, ServiceCategoryConfig } from '../../types';
 
 interface SettingsViewProps {
+  authToken?: string | null;
   services?: Service[];
   serviceCategories?: ServiceCategoryConfig[];
   onCreateCategory?: (payload: {
@@ -103,6 +106,7 @@ const roles = [
 ];
 
 export function SettingsView({
+  authToken = null,
   services = [],
   products = [],
   serviceCategories = [],
@@ -122,6 +126,99 @@ export function SettingsView({
   const [isNewProductCategoryModalOpen, setIsNewProductCategoryModalOpen] = useState(false);
   const [productCategoryToEdit, setProductCategoryToEdit] = useState<ProductCategoryConfig | null>(null);
   const [productCategoryToDelete, setProductCategoryToDelete] = useState<ProductCategoryConfig | null>(null);
+
+  const [customerSources, setCustomerSources] = useState<Array<{ id: string; name: string }>>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
+  const [sourcesLoadError, setSourcesLoadError] = useState<string | null>(null);
+  const [sourceEditorOpen, setSourceEditorOpen] = useState(false);
+  const [sourceEditorId, setSourceEditorId] = useState<string | null>(null);
+  const [sourceEditorName, setSourceEditorName] = useState('');
+  const [sourceSaving, setSourceSaving] = useState(false);
+  const [sourceToDelete, setSourceToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  const loadCustomerSources = useCallback(async () => {
+    if (!authToken) {
+      setCustomerSources([]);
+      setSourcesLoadError('Cần đăng nhập để quản lý nguồn khách.');
+      return;
+    }
+    setSourcesLoading(true);
+    setSourcesLoadError(null);
+    try {
+      const response = await fetch('/api/customer-sources', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || 'Không thể tải danh sách nguồn khách.');
+      }
+      const list = Array.isArray(data?.sources)
+        ? data.sources.map((s: { id: string; name: string }) => ({
+            id: String(s.id),
+            name: String(s.name || ''),
+          }))
+        : [];
+      setCustomerSources(list);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Không thể tải nguồn khách.';
+      setSourcesLoadError(message);
+      setCustomerSources([]);
+    } finally {
+      setSourcesLoading(false);
+    }
+  }, [authToken]);
+
+  useEffect(() => {
+    loadCustomerSources();
+  }, [loadCustomerSources]);
+
+  const openCreateSource = () => {
+    setSourceEditorId(null);
+    setSourceEditorName('');
+    setSourceEditorOpen(true);
+  };
+
+  const openEditSource = (id: string, name: string) => {
+    setSourceEditorId(id);
+    setSourceEditorName(name);
+    setSourceEditorOpen(true);
+  };
+
+  const saveSourceEditor = async () => {
+    if (!authToken) {
+      alert('Phiên đăng nhập không hợp lệ.');
+      return;
+    }
+    const name = sourceEditorName.trim();
+    if (!name) {
+      alert('Vui lòng nhập tên nguồn khách.');
+      return;
+    }
+    setSourceSaving(true);
+    try {
+      const url = sourceEditorId ? `/api/customer-sources/${sourceEditorId}` : '/api/customer-sources';
+      const method = sourceEditorId ? 'PUT' : 'POST';
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || 'Không thể lưu nguồn khách.');
+      }
+      await loadCustomerSources();
+      window.dispatchEvent(new Event('customer-sources:changed'));
+      setSourceEditorOpen(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Không thể lưu nguồn khách.');
+    } finally {
+      setSourceSaving(false);
+    }
+  };
 
   const serviceCountByCategory = services.reduce<Record<string, number>>((acc, service) => {
     const key = String(service.category || '').trim();
@@ -617,7 +714,17 @@ export function SettingsView({
               <h3 className="text-2xl font-serif text-primary">{activeTab}</h3>
               <p className="text-stone-400 text-sm">Quản lý các tham số phân tích dữ liệu khách hàng</p>
             </div>
-            <button className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xl hover:bg-primary-light transition-all">
+            <button
+              type="button"
+              disabled={activeTab !== 'Nguồn khách'}
+              onClick={() => {
+                if (activeTab === 'Nguồn khách') openCreateSource();
+              }}
+              className={cn(
+                'bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-xl hover:bg-primary-light transition-all',
+                activeTab !== 'Nguồn khách' && 'opacity-40 cursor-not-allowed hover:bg-primary'
+              )}
+            >
               <Plus size={16} /> Thêm mới
             </button>
           </div>
@@ -625,23 +732,76 @@ export function SettingsView({
           <div className="bg-white rounded-[3rem] shadow-sm border border-stone-100 overflow-hidden">
             <div className="p-10 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {(activeTab === 'Nguồn khách' ? ['Facebook', 'Instagram', 'TikTok', 'Zalo', 'Walk-in', 'Referral'] : ['Khách quên lịch', 'Trùng lịch thợ', 'Khách bận đột xuất', 'Thời tiết xấu', 'Lỗi hệ thống']).map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-6 bg-stone-50/50 rounded-2xl border border-stone-50 group hover:border-primary/20 transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm",
-                        activeTab === 'Nguồn khách' ? "bg-primary" : "bg-red-900"
-                      )}>
-                        {activeTab === 'Nguồn khách' ? <Share2 size={18} /> : <XCircle size={18} />}
+                {activeTab === 'Nguồn khách' ? (
+                  <>
+                    {sourcesLoading && (
+                      <p className="col-span-full text-sm text-stone-400">Đang tải nguồn khách...</p>
+                    )}
+                    {!sourcesLoading && sourcesLoadError && (
+                      <p className="col-span-full text-sm text-red-500">{sourcesLoadError}</p>
+                    )}
+                    {!sourcesLoading && !sourcesLoadError && !customerSources.length && (
+                      <p className="col-span-full text-sm text-stone-400">
+                        Chưa có nguồn khách. Nhấn Thêm mới để tạo.
+                      </p>
+                    )}
+                    {customerSources.map((src) => (
+                      <div
+                        key={src.id}
+                        className="flex items-center justify-between p-6 bg-stone-50/50 rounded-2xl border border-stone-50 group hover:border-primary/20 transition-all"
+                      >
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm bg-primary shrink-0">
+                            <Share2 size={18} />
+                          </div>
+                          <span className="text-sm font-bold text-primary truncate">{src.name}</span>
+                        </div>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openEditSource(src.id, src.name)}
+                            className="text-stone-300 hover:text-primary transition-colors"
+                            aria-label="Sửa nguồn khách"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSourceToDelete({ id: src.id, name: src.name })}
+                            className="text-stone-300 hover:text-red-500 transition-colors"
+                            aria-label="Xóa nguồn khách"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
-                      <span className="text-sm font-bold text-primary">{item}</span>
-                    </div>
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="text-stone-300 hover:text-primary transition-colors"><Edit2 size={14} /></button>
-                      <button className="text-stone-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                ))}
+                    ))}
+                  </>
+                ) : (
+                  ['Khách quên lịch', 'Trùng lịch thợ', 'Khách bận đột xuất', 'Thời tiết xấu', 'Lỗi hệ thống'].map(
+                    (item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-6 bg-stone-50/50 rounded-2xl border border-stone-50 group hover:border-primary/20 transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm bg-red-900">
+                            <XCircle size={18} />
+                          </div>
+                          <span className="text-sm font-bold text-primary">{item}</span>
+                        </div>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button type="button" className="text-stone-300 hover:text-primary transition-colors">
+                            <Edit2 size={14} />
+                          </button>
+                          <button type="button" className="text-stone-300 hover:text-red-500 transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -712,11 +872,17 @@ export function SettingsView({
             <Share2 size={12} /> NGUỒN KHÁCH HÀNG
           </h4>
           <div className="flex flex-wrap gap-2">
-            {['Facebook', 'Zalo', 'Walk-in', 'Referral'].map(source => (
-              <span key={source} className="bg-white border border-stone-100 px-4 py-2 rounded-xl text-[10px] font-bold text-stone-600 shadow-sm">
-                {source}
+            {customerSources.map((source) => (
+              <span
+                key={source.id}
+                className="bg-white border border-stone-100 px-4 py-2 rounded-xl text-[10px] font-bold text-stone-600 shadow-sm"
+              >
+                {source.name}
               </span>
             ))}
+            {!customerSources.length && !sourcesLoading && (
+              <span className="text-[10px] font-bold text-stone-400">Chưa có nguồn khách (vào Hệ thống → Nguồn khách)</span>
+            )}
           </div>
         </div>
 
@@ -822,6 +988,105 @@ export function SettingsView({
             title="Xác nhận xóa danh mục sản phẩm"
             unitLabel="sản phẩm"
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sourceToDelete && (
+          <DeleteCustomerSourceModal
+            sourceName={sourceToDelete.name}
+            onClose={() => setSourceToDelete(null)}
+            onConfirm={async () => {
+              if (!authToken) {
+                alert('Phiên đăng nhập không hợp lệ.');
+                return;
+              }
+              try {
+                const id = sourceToDelete.id;
+                const response = await fetch(`/api/customer-sources/${id}`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${authToken}` },
+                });
+                const data = await response.json().catch(() => null);
+                if (!response.ok) {
+                  throw new Error(data?.message || 'Không thể xóa nguồn khách.');
+                }
+                await loadCustomerSources();
+                window.dispatchEvent(new Event('customer-sources:changed'));
+                setSourceToDelete(null);
+              } catch (e) {
+                alert(e instanceof Error ? e.message : 'Không thể xóa nguồn khách.');
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sourceEditorOpen && (
+          <div className="fixed inset-0 z-[140] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-stone-900/50 backdrop-blur-sm"
+              onClick={() => !sourceSaving && setSourceEditorOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-white w-full max-w-md rounded-[2rem] shadow-2xl border border-stone-100 overflow-hidden z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-8 flex justify-between items-start border-b border-stone-100">
+                <h4 className="text-xl font-serif text-primary pr-8">
+                  {sourceEditorId ? 'Sửa nguồn khách' : 'Thêm nguồn khách'}
+                </h4>
+                <button
+                  type="button"
+                  disabled={sourceSaving}
+                  onClick={() => setSourceEditorOpen(false)}
+                  className="p-2 text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-40"
+                  aria-label="Đóng"
+                >
+                  <X size={22} />
+                </button>
+              </div>
+              <div className="p-8 space-y-4">
+                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">
+                  Tên nguồn
+                </label>
+                <input
+                  type="text"
+                  value={sourceEditorName}
+                  onChange={(e) => setSourceEditorName(e.target.value)}
+                  placeholder="Ví dụ: Facebook, Zalo..."
+                  disabled={sourceSaving}
+                  className="w-full bg-stone-50 border border-stone-100 rounded-2xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all outline-none disabled:opacity-60"
+                  autoFocus
+                />
+              </div>
+              <div className="p-8 pt-0 flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={sourceSaving}
+                  onClick={() => setSourceEditorOpen(false)}
+                  className="px-6 py-3 text-sm font-bold text-stone-400 hover:text-stone-600 transition-colors disabled:opacity-40"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={sourceSaving}
+                  onClick={() => void saveSourceEditor()}
+                  className="px-8 py-3 rounded-2xl text-sm font-bold bg-primary text-white shadow-lg hover:bg-primary-light transition-all disabled:bg-stone-300 disabled:text-stone-600"
+                >
+                  {sourceSaving ? 'Đang lưu...' : 'Lưu'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </motion.div>

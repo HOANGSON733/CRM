@@ -74,9 +74,9 @@ export function TerminateEmployeeModal({ employee, onClose, onConfirm, onDelete 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden"
+        className="relative w-full max-w-xl bg-white rounded-[2rem] shadow-2xl overflow-hidden"
       >
-        <div className="p-12 space-y-8">
+        <div className="p-8 space-y-6">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-3 text-red-600">
               <AlertTriangle size={20} />
@@ -101,7 +101,7 @@ export function TerminateEmployeeModal({ employee, onClose, onConfirm, onDelete 
             <button 
               onClick={() => setLeaveType('temporary')}
               className={cn(
-                "p-6 rounded-2xl border-2 text-left transition-all relative",
+                "p-5 rounded-2xl border-2 text-left transition-all relative",
                 leaveType === 'temporary' ? "border-primary bg-primary/[0.02]" : "border-stone-100 hover:border-stone-200"
               )}
             >
@@ -123,7 +123,7 @@ export function TerminateEmployeeModal({ employee, onClose, onConfirm, onDelete 
             <button 
               onClick={() => setLeaveType('permanent')}
               className={cn(
-                "p-6 rounded-2xl border-2 text-left transition-all relative",
+                "p-5 rounded-2xl border-2 text-left transition-all relative",
                 leaveType === 'permanent' ? "border-red-600 bg-red-50/30" : "border-stone-100 hover:border-stone-200"
               )}
             >
@@ -174,7 +174,7 @@ export function TerminateEmployeeModal({ employee, onClose, onConfirm, onDelete 
             </div>
           </div>
 
-          <div className="bg-red-50 p-6 rounded-2xl flex gap-4">
+          <div className="bg-red-50 p-5 rounded-2xl flex gap-4">
             <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shrink-0">
               <CalendarX size={20} />
             </div>

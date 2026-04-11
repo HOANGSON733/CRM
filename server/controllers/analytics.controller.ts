@@ -71,15 +71,25 @@ export async function getDashboardAnalytics(req: Request, res: Response) {
     const now = new Date();
     const todayFrom = startOfDay(now);
     const todayTo = endOfDay(now);
-    const weekFrom = startOfDay(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000));
-    const weekTo = endOfDay(now);
     const monthFrom = startOfMonth(now);
     const monthTo = endOfDay(now);
+    
+    const chartRange = String(req.query.chartRange || 'week');
+    let chartFrom: Date;
+    let chartTo = endOfDay(now);
+
+    if (chartRange === 'year') {
+      chartFrom = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+    } else if (chartRange === 'month') {
+      chartFrom = startOfDay(new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000));
+    } else {
+      chartFrom = startOfDay(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000));
+    }
 
     const orders = currentDb().collection('pos_orders');
     const customers = currentDb().collection('customers');
 
-    const [todayAgg, weekAgg, monthNewCustomers] = await Promise.all([
+    const [todayAgg, chartAgg, monthNewCustomers] = await Promise.all([
       orders
         .aggregate([
           { $match: { createdAt: { $gte: todayFrom, $lte: todayTo } } },
@@ -94,7 +104,7 @@ export async function getDashboardAnalytics(req: Request, res: Response) {
         .toArray(),
       orders
         .aggregate([
-          { $match: { createdAt: { $gte: weekFrom, $lte: weekTo } } },
+          { $match: { createdAt: { $gte: chartFrom, $lte: chartTo } } },
           {
             $group: {
               _id: {
@@ -113,26 +123,56 @@ export async function getDashboardAnalytics(req: Request, res: Response) {
 
     const todayRow = todayAgg?.[0] || { ordersCount: 0, revenue: 0 };
 
-    // Fill 7 days chart (T2..CN style labels).
-    const byKey = new Map<string, number>();
-    for (const row of weekAgg) {
+    const byDayKey = new Map<string, number>();
+    const byMonthKey = new Map<string, number>();
+
+    for (const row of chartAgg) {
       const y = row?._id?.y;
       const m = row?._id?.m;
       const d = row?._id?.d;
-      const key = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      byKey.set(key, toNumber(row?.revenue));
+      const dayKey = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const monthKey = `${y}-${String(m).padStart(2, '0')}`;
+      byDayKey.set(dayKey, toNumber(row?.revenue));
+      
+      const existingM = byMonthKey.get(monthKey) || 0;
+      byMonthKey.set(monthKey, existingM + toNumber(row?.revenue));
     }
-    const weeklyRevenueData = Array.from({ length: 7 }).map((_, idx) => {
-      const dt = new Date(weekFrom.getTime() + idx * 24 * 60 * 60 * 1000);
-      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-      const weekday = new Intl.DateTimeFormat('vi-VN', { weekday: 'short' }).format(dt);
-      return { name: weekday.replace('Th', 'T').replace('CN', 'CN'), value: byKey.get(key) || 0 };
-    });
 
-    // Service allocation (share by service items revenue) in the last 30 days.
+    let weeklyRevenueData: Array<{name: string, value: number}> = [];
+    
+    if (chartRange === 'year') {
+      for (let i = 0; i < 12; i++) {
+        const monthKey = `${now.getFullYear()}-${String(i + 1).padStart(2, '0')}`;
+        weeklyRevenueData.push({
+          name: `T${i + 1}`,
+          value: byMonthKey.get(monthKey) || 0
+        });
+      }
+    } else if (chartRange === 'month') {
+      for (let i = 0; i < 30; i++) {
+        const dt = new Date(chartFrom.getTime() + i * 24 * 60 * 60 * 1000);
+        const dayKey = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        weeklyRevenueData.push({
+          name: `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`,
+          value: byDayKey.get(dayKey) || 0
+        });
+      }
+    } else {
+      for (let i = 0; i < 7; i++) {
+        const dt = new Date(chartFrom.getTime() + i * 24 * 60 * 60 * 1000);
+        const dayKey = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        const weekday = new Intl.DateTimeFormat('vi-VN', { weekday: 'short' }).format(dt);
+        weeklyRevenueData.push({
+          name: weekday.replace('Th', 'T').replace('CN', 'CN'),
+          value: byDayKey.get(dayKey) || 0
+        });
+      }
+    }
+
+    // Service allocation (share by service items revenue) dynamically based on chartRange.
     const allocationAgg = await orders
       .aggregate([
-        { $match: { createdAt: { $gte: monthFrom, $lte: monthTo } } },
+        { $match: { createdAt: { $gte: chartFrom, $lte: chartTo } } },
         { $unwind: '$items' },
         { $match: { 'items.type': 'service' } },
         {
@@ -153,9 +193,9 @@ export async function getDashboardAnalytics(req: Request, res: Response) {
       color: palette[i % palette.length],
     }));
 
-    // Recent POS orders today (replace "appointments" demo list on dashboard)
+    // Recent POS orders dynamically based on chartRange (replace "appointments" demo list on dashboard)
     const recentOrders = await orders
-      .find({ createdAt: { $gte: todayFrom, $lte: todayTo } })
+      .find({ createdAt: { $gte: chartFrom, $lte: chartTo } })
       .sort({ createdAt: -1 })
       .limit(8)
       .toArray();
@@ -183,7 +223,7 @@ export async function getDashboardAnalytics(req: Request, res: Response) {
     }
     const todayOrders = recentOrders.map((o) => {
       const createdAt = o?.createdAt ? new Date(o.createdAt) : new Date();
-      const time = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(createdAt);
+      const time = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(createdAt);
       const customerName =
         o?.isWalkIn
           ? String(o?.customerName || '').trim() || 'Khách vãng lai'

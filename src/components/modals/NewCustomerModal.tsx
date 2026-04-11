@@ -1,11 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Upload } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { prepareImageFromFile } from '../../lib/imageUpload';
+import { CUSTOMER_SOURCES, DEFAULT_CUSTOMER_SOURCE } from '../../lib/customerSources';
 import { Employee } from '../../types';
 
 interface NewCustomerModalProps {
+  authToken?: string | null;
   onClose: () => void;
   employees: Employee[];
   onSave: (payload: {
@@ -21,8 +23,9 @@ interface NewCustomerModalProps {
   }) => Promise<void>;
 }
 
-export function NewCustomerModal({ onClose, onSave, employees }: NewCustomerModalProps) {
-  const [selectedSource, setSelectedSource] = useState('Facebook');
+export function NewCustomerModal({ authToken = null, onClose, onSave, employees }: NewCustomerModalProps) {
+  const [sourceOptions, setSourceOptions] = useState<string[]>(() => [...CUSTOMER_SOURCES]);
+  const [selectedSource, setSelectedSource] = useState(DEFAULT_CUSTOMER_SOURCE);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -35,6 +38,39 @@ export function NewCustomerModal({ onClose, onSave, employees }: NewCustomerModa
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const loadSourceOptions = useCallback(() => {
+    if (!authToken) {
+      setSourceOptions([...CUSTOMER_SOURCES]);
+      return;
+    }
+    fetch('/api/customer-sources', {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(data?.message || 'Không thể tải nguồn khách.');
+        const names = Array.isArray(data?.sources)
+          ? data.sources.map((s: { name: string }) => String(s.name || '').trim()).filter(Boolean)
+          : [];
+        setSourceOptions(names.length ? names : [...CUSTOMER_SOURCES]);
+      })
+      .catch(() => setSourceOptions([...CUSTOMER_SOURCES]));
+  }, [authToken]);
+
+  useEffect(() => {
+    loadSourceOptions();
+  }, [loadSourceOptions]);
+
+  useEffect(() => {
+    const onChanged = () => loadSourceOptions();
+    window.addEventListener('customer-sources:changed', onChanged);
+    return () => window.removeEventListener('customer-sources:changed', onChanged);
+  }, [loadSourceOptions]);
+
+  useEffect(() => {
+    setSelectedSource((prev) => (sourceOptions.includes(prev) ? prev : sourceOptions[0] || DEFAULT_CUSTOMER_SOURCE));
+  }, [sourceOptions]);
 
   const handleChooseAvatar = () => {
     fileInputRef.current?.click();
@@ -218,7 +254,7 @@ export function NewCustomerModal({ onClose, onSave, employees }: NewCustomerModa
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">NGUỒN BIẾT ĐẾN</label>
                   <div className="flex flex-wrap gap-2">
-                    {['Facebook', 'Instagram', 'TikTok', 'Người quen', 'Vãng lai'].map(source => (
+                    {sourceOptions.map((source) => (
                       <button 
                         key={source}
                         onClick={() => setSelectedSource(source)}

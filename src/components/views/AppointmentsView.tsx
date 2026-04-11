@@ -14,14 +14,18 @@ import {
 } from 'lucide-react';
 import { FilterCheckbox } from '../FilterCheckbox';
 import { cn } from '../../lib/utils';
+import { NewAppointmentModal } from '../modals/NewAppointmentModal';
+import type { Employee, Service } from '../../types';
 
 interface AppointmentsViewProps {
   authToken: string | null;
   onNewAppointment: () => void;
+  services?: Service[];
+  employees?: Employee[];
   key?: string;
 }
 
-export function AppointmentsView({ authToken, onNewAppointment }: AppointmentsViewProps) {
+export function AppointmentsView({ authToken, onNewAppointment, services = [], employees = [] }: AppointmentsViewProps) {
   const now = new Date();
   const [selectedDate, setSelectedDate] = useState(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
   const [viewMonthDate, setViewMonthDate] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -32,6 +36,7 @@ export function AppointmentsView({ authToken, onNewAppointment }: AppointmentsVi
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [appointmentToEdit, setAppointmentToEdit] = useState<any>(null);
   const [stylistFilter, setStylistFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
   const [statusFilters, setStatusFilters] = useState<Record<string, boolean>>({
@@ -117,14 +122,21 @@ export function AppointmentsView({ authToken, onNewAppointment }: AppointmentsVi
         const endHour = Math.floor(endTotalMinutes / 60);
         const endMinute = endTotalMinutes % 60;
         return {
-          id: item?.id || `apt-${idx}`,
+          id: String(item?.id || `apt-${idx}`),
           customer: item?.customerName || 'Khách',
+          customerName: item?.customerName || 'Khách',
           service: item?.serviceName || 'Dịch vụ',
+          serviceId: item?.serviceId || '',
           stylist: item?.stylistName || '—',
           stylistId: item?.stylistId || '',
           status: item?.status || 'confirmed',
           date: item?.date || dateKey,
           phone: item?.customerPhone || '—',
+          customerPhone: item?.customerPhone || '',
+          time,
+          notes: item?.notes || '',
+          smsReminder: Boolean(item?.smsReminder),
+          durationMinutes,
           start: `${String(topHour).padStart(2, '0')}:${String(topMinute).padStart(2, '0')}`,
           end: `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`,
           top,
@@ -197,43 +209,21 @@ export function AppointmentsView({ authToken, onNewAppointment }: AppointmentsVi
     return weekDateKeys.map((key) => ({ key, items: byDate.get(key) || [] }));
   }, [filteredData, weekDateKeys]);
 
-  const handleEditAppointment = async () => {
-    if (!authToken || !selectedAppointment) return;
-    const nextTime = window.prompt('Nhập giờ mới (HH:mm)', selectedAppointment.start || '09:00');
-    if (!nextTime) return;
-    if (!/^\d{2}:\d{2}$/.test(nextTime)) {
-      alert('Định dạng giờ không hợp lệ. Ví dụ: 14:30');
-      return;
-    }
-    setActionLoading(true);
-    try {
-      const response = await fetch(`/api/appointments/${selectedAppointment.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          date: selectedAppointment.date,
-          time: nextTime,
-          status: selectedAppointment.status,
-          notes: '',
-          stylistId: selectedAppointment.stylistId || '',
-        }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.message || 'Không thể cập nhật lịch hẹn.');
-      }
-      setSelectedAppointment(null);
-      loadSchedule();
-      window.dispatchEvent(new Event('appointments:changed'));
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Không thể cập nhật lịch hẹn.';
-      alert(message);
-    } finally {
-      setActionLoading(false);
-    }
+  const handleEditAppointment = () => {
+    if (!selectedAppointment) return;
+    setAppointmentToEdit({
+      id: String(selectedAppointment.id || ''),
+      customerName: selectedAppointment.customerName || selectedAppointment.customer || '',
+      customerPhone: selectedAppointment.customerPhone || '',
+      serviceId: selectedAppointment.serviceId || '',
+      stylistId: selectedAppointment.stylistId || '',
+      date: selectedAppointment.date,
+      time: selectedAppointment.time || selectedAppointment.start || '09:00',
+      notes: selectedAppointment.notes || '',
+      smsReminder: selectedAppointment.smsReminder ?? true,
+      status: selectedAppointment.status || 'confirmed',
+    });
+    setSelectedAppointment(null);
   };
 
   const handleDeleteAppointment = async () => {
@@ -242,7 +232,11 @@ export function AppointmentsView({ authToken, onNewAppointment }: AppointmentsVi
     if (!ok) return;
     setActionLoading(true);
     try {
-      const response = await fetch(`/api/appointments/${selectedAppointment.id}`, {
+      const appointmentId = String(selectedAppointment.id || '').trim();
+      if (!appointmentId) {
+        throw new Error('Không tìm thấy id lịch hẹn để xóa.');
+      }
+      const response = await fetch(`/api/appointments/${appointmentId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${authToken}` },
       });
@@ -517,7 +511,7 @@ export function AppointmentsView({ authToken, onNewAppointment }: AppointmentsVi
                     <p className="text-sm font-bold text-stone-700">{selectedAppointment.service}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">THỜI CHÍNH</p>
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">THỢ CHÍNH</p>
                     <p className="text-sm font-bold text-stone-700">{selectedAppointment.stylist}</p>
                   </div>
                   <div>
@@ -549,6 +543,22 @@ export function AppointmentsView({ authToken, onNewAppointment }: AppointmentsVi
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {appointmentToEdit && (
+          <NewAppointmentModal
+            onClose={() => setAppointmentToEdit(null)}
+            authToken={authToken}
+            services={services}
+            employees={employees}
+            initialData={appointmentToEdit}
+            onSaved={() => {
+              setAppointmentToEdit(null);
+              loadSchedule();
+            }}
+          />
         )}
       </AnimatePresence>
     </motion.div>

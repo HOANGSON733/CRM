@@ -10,6 +10,10 @@ function normalizePhone(phone: string) {
   return phone.replace(/\s+/g, '');
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export async function createCustomer(req: Request, res: Response) {
   try {
     const token = getTokenFromHeader(req.headers.authorization);
@@ -74,6 +78,28 @@ export async function createCustomer(req: Request, res: Response) {
   }
 }
 
+function mapCustomerDoc(customer: any) {
+  return {
+    id: String(customer._id),
+    name: customer.name || '',
+    tags: Array.isArray(customer.tags) ? customer.tags : [],
+    phone: customer.phone || '',
+    email: customer.email || '',
+    source: String(customer.source || '').trim(),
+    lastVisit: customer.lastVisit || '',
+    avatar:
+      customer.avatar ||
+      'https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg',
+    memberSince: customer.memberSince,
+    points: customer.points,
+    maxPoints: customer.maxPoints,
+    spendingData: customer.spendingData || [],
+    history: customer.history || [],
+    isWalkIn: false,
+    createdAt: customer.createdAt || new Date(0),
+  };
+}
+
 export async function listCustomers(req: Request, res: Response) {
   try {
     const token = getTokenFromHeader(req.headers.authorization);
@@ -83,34 +109,52 @@ export async function listCustomers(req: Request, res: Response) {
 
     verifyAuthToken(token);
 
-    const customers = await currentDb()
-      .collection('customers')
-      .find({})
-      .toArray();
-    const merged = [
-      ...customers.map((customer) => ({
-        id: String(customer._id),
-        name: customer.name || '',
-        tags: Array.isArray(customer.tags) ? customer.tags : [],
-        phone: customer.phone || '',
-        email: customer.email || '',
-        lastVisit: customer.lastVisit || '',
-        avatar:
-          customer.avatar ||
-          'https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg',
-        memberSince: customer.memberSince,
-        points: customer.points,
-        maxPoints: customer.maxPoints,
-        spendingData: customer.spendingData || [],
-        history: customer.history || [],
-        isWalkIn: false,
-        createdAt: customer.createdAt || new Date(0),
-      })),
-    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const page = Math.max(1, Number(req.query.page || 1));
+    const pageSize = Math.min(500, Math.max(1, Number(req.query.pageSize || 15)));
+    const skip = (page - 1) * pageSize;
+    const qRaw = String(req.query.q || '').trim();
+    const col = currentDb().collection('customers');
+
+    const filter: Record<string, unknown> = {};
+    if (qRaw) {
+      const phoneQ = normalizePhone(qRaw);
+      const escapedName = escapeRegex(qRaw);
+      const orConditions: Record<string, unknown>[] = [
+        { name: { $regex: escapedName, $options: 'i' } },
+        { email: { $regex: escapedName, $options: 'i' } },
+      ];
+      if (phoneQ.length > 0) {
+        const escapedPhone = escapeRegex(phoneQ);
+        orConditions.push({ phone: { $regex: escapedPhone, $options: 'i' } });
+        orConditions.push({
+          $expr: {
+            $regexMatch: {
+              input: { $toString: { $ifNull: ['$phone', ''] } },
+              regex: escapedPhone,
+              options: 'i',
+            },
+          },
+        });
+      }
+      filter.$or = orConditions;
+    }
+
+    const [customerDocs, total] = await Promise.all([
+      col.find(filter).sort({ createdAt: -1 }).skip(skip).limit(pageSize).toArray(),
+      col.countDocuments(filter),
+    ]);
+
+    const merged = customerDocs.map((c) => mapCustomerDoc(c));
 
     return res.json({
       ok: true,
       customers: merged.map(({ createdAt, ...rest }) => rest),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
     });
   } catch (_error) {
     return res.status(401).json({ message: 'Không thể tải danh sách khách hàng.' });

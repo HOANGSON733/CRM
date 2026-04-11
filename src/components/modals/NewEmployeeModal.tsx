@@ -16,6 +16,7 @@ interface NewEmployeeModalProps {
     startDate: string;
     defaultShift: string;
     avatar?: string;
+    status?: string;
   };
   saveLabel?: string;
   title?: string;
@@ -30,6 +31,7 @@ interface NewEmployeeModalProps {
     startDate: string;
     defaultShift: string;
     avatar?: string;
+    status?: string;
   }) => Promise<void>;
 }
 
@@ -48,9 +50,11 @@ export function NewEmployeeModal({
   const [email, setEmail] = useState(initialData?.email || '');
   const [role, setRole] = useState(initialData?.role || 'Senior Stylist');
   const [commissionRate, setCommissionRate] = useState(String(initialData?.commissionRate ?? 15));
+  const [birthday, setBirthday] = useState(initialData?.birthday || '');
   const [startDate, setStartDate] = useState(initialData?.startDate || '');
   const [defaultShift, setDefaultShift] = useState(initialData?.defaultShift || 'Ca Sáng (08:00 - 16:00)');
   const [avatar, setAvatar] = useState<string | undefined>(initialData?.avatar || undefined);
+  const [status, setStatus] = useState(initialData?.status || 'available');
   const [avatarName, setAvatarName] = useState(initialData?.avatar ? 'Ảnh hiện tại' : '');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -80,9 +84,11 @@ export function NewEmployeeModal({
         role,
         commissionRate: Number(commissionRate || 0),
         specialties,
+        birthday,
         startDate,
         defaultShift,
         avatar,
+        status,
       });
       onClose();
     } catch (error) {
@@ -129,12 +135,12 @@ export function NewEmployeeModal({
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="relative w-full max-w-5xl bg-white rounded-[3rem] shadow-2xl overflow-hidden flex min-h-[700px]"
+        className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex max-h-[90vh]"
       >
         {/* Left Side - Info */}
-        <div className="w-2/5 bg-primary p-16 text-white flex flex-col justify-between relative overflow-hidden">
-          <div className="relative z-10 space-y-6">
-            <h2 className="text-5xl font-serif leading-tight">{title}</h2>
+        <div className="w-2/5 bg-primary p-10 text-white flex flex-col justify-between relative overflow-hidden">
+          <div className="relative z-10 space-y-4">
+            <h2 className="text-4xl font-serif leading-tight">{title}</h2>
             <p className="text-white/60 text-sm leading-relaxed">
               {description}
             </p>
@@ -172,7 +178,7 @@ export function NewEmployeeModal({
         </div>
 
         {/* Right Side - Form */}
-        <div className="flex-1 p-16 space-y-10 overflow-y-auto">
+        <div className="flex-1 p-10 space-y-6 overflow-y-auto">
           <div className="flex justify-end">
             <button 
               onClick={onClose}
@@ -182,7 +188,7 @@ export function NewEmployeeModal({
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-2 gap-5">
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">HỌ VÀ TÊN</label>
               <input 
@@ -205,18 +211,32 @@ export function NewEmployeeModal({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">EMAIL LIÊN HỆ</label>
-            <input 
-              type="email" 
-              placeholder="artist@atelier.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
-            />
+          <div className="grid grid-cols-2 gap-5">
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">EMAIL LIÊN HỆ</label>
+              <input 
+                type="email" 
+                placeholder="artist@atelier.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">NGÀY SINH</label>
+              <div className="relative">
+                <Calendar size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+                <input 
+                  type="date"
+                  value={birthday}
+                  onChange={(e) => setBirthday(e.target.value)}
+                  className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-2 gap-5">
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">CẤP BẬC (ROLE)</label>
               <div className="relative">
@@ -300,6 +320,25 @@ export function NewEmployeeModal({
               </div>
             </div>
           </div>
+
+          {initialData && (
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TÌNH TRẠNG LÀM VIỆC</label>
+              <div className="relative">
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full bg-stone-50 border-none rounded-2xl py-4 px-6 text-sm font-bold text-primary focus:ring-2 focus:ring-primary/10 transition-all appearance-none cursor-pointer"
+                >
+                  <option value="available">Đang làm việc (Rảnh)</option>
+                  <option value="busy">Đang phục vụ khách (Bận)</option>
+                  <option value="on-leave">Tạm nghỉ (Phép)</option>
+                  <option value="terminated">Đã nghỉ việc</option>
+                </select>
+                <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-6 pt-6">
             <button 

@@ -47,6 +47,7 @@ export async function listEmployees(req: Request, res: Response) {
                 ? 'busy'
                 : 'available',
         specialties: Array.isArray(employee.specialties) ? employee.specialties : [],
+        birthday: employee.birthday || '',
         startDate: employee.startDate || '',
         defaultShift: employee.defaultShift || '',
         bio: employee.bio,
@@ -71,6 +72,7 @@ export async function createEmployee(req: Request, res: Response) {
     const specialties = Array.isArray(req.body?.specialties)
       ? req.body.specialties.map((item: string) => String(item))
       : [];
+    const birthday = String(req.body?.birthday || '').trim();
     const startDate = String(req.body?.startDate || '').trim();
     const defaultShift = String(req.body?.defaultShift || '').trim();
     const avatar = String(req.body?.avatar || '').trim();
@@ -92,6 +94,7 @@ export async function createEmployee(req: Request, res: Response) {
       role,
       commissionRate,
       specialties,
+      birthday,
       startDate,
       defaultShift,
       rating: 5,
@@ -132,6 +135,7 @@ export async function updateEmployee(req: Request, res: Response) {
     const specialties = Array.isArray(req.body?.specialties)
       ? req.body.specialties.map((item: string) => String(item))
       : [];
+    const birthday = String(req.body?.birthday || '').trim();
     const startDate = String(req.body?.startDate || '').trim();
     const defaultShift = String(req.body?.defaultShift || '').trim();
     const avatar = String(req.body?.avatar || '').trim();
@@ -153,18 +157,23 @@ export async function updateEmployee(req: Request, res: Response) {
       return res.status(409).json({ message: 'Số điện thoại nhân viên đã tồn tại.' });
     }
 
-    const updated = {
+    const updated: any = {
       name,
       phone,
       email,
       role,
       commissionRate,
       specialties,
+      birthday,
       startDate,
       defaultShift,
       avatar: avatar || '',
       updatedAt: new Date(),
     };
+    
+    if (req.body?.status) {
+      updated.status = String(req.body.status);
+    }
 
     await currentDb().collection('employees').updateOne(
       { _id: new ObjectId(employeeId) },
@@ -241,6 +250,7 @@ export async function terminateEmployee(req: Request, res: Response) {
                 ? 'busy'
                 : 'available',
         specialties: Array.isArray(result.specialties) ? result.specialties : [],
+        birthday: result.birthday || '',
         startDate: result.startDate || '',
         defaultShift: result.defaultShift || '',
         bio: result.bio,

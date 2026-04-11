@@ -120,6 +120,7 @@ export default function App() {
   const [customerToDelete, setCustomerToDelete] = useState<any>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersTotal, setCustomersTotal] = useState(0);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [serviceCategories, setServiceCategories] = useState<ServiceCategoryConfig[]>([]);
@@ -132,7 +133,7 @@ export default function App() {
   const [productsTotal, setProductsTotal] = useState(0);
 
   const loadCustomers = async (token: string) => {
-    const response = await fetch('/api/customers', {
+    const response = await fetch('/api/customers?page=1&pageSize=500', {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) {
@@ -141,6 +142,7 @@ export default function App() {
     }
     const data = await response.json();
     setCustomers(Array.isArray(data?.customers) ? data.customers : []);
+    setCustomersTotal(Number(data?.pagination?.total ?? data?.customers?.length ?? 0));
   };
 
   const loadEmployees = async (token: string) => {
@@ -241,6 +243,7 @@ export default function App() {
         setAuthToken(null);
         setIsLoggedIn(false);
         setCustomers([]);
+        setCustomersTotal(0);
         setEmployees([]);
         setServices([]);
         setServiceCategories([]);
@@ -277,6 +280,7 @@ export default function App() {
     setAuthToken(null);
     setIsLoggedIn(false);
     setCustomers([]);
+    setCustomersTotal(0);
     setEmployees([]);
     setServices([]);
     setServiceCategories([]);
@@ -606,6 +610,7 @@ export default function App() {
     }
 
     await loadCustomers(authToken);
+    window.dispatchEvent(new Event('customers:changed'));
   };
 
   const handleCreateEmployee = async (payload: {
@@ -615,6 +620,7 @@ export default function App() {
     role: string;
     commissionRate: number;
     specialties: string[];
+    birthday?: string;
     startDate: string;
     defaultShift: string;
     avatar?: string;
@@ -647,9 +653,11 @@ export default function App() {
     role: string;
     commissionRate: number;
     specialties: string[];
+    birthday?: string;
     startDate: string;
     defaultShift: string;
     avatar?: string;
+    status?: string;
   }) => {
     if (!authToken || !selectedEmployee) {
       throw new Error('Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
@@ -893,12 +901,18 @@ export default function App() {
               onNewCustomer={() => setIsNewCustomerModalOpen(true)}
             />
           ) : activeTab === 'appointments' ? (
-            <AppointmentsView key="appointments" authToken={authToken} onNewAppointment={() => setIsNewAppointmentModalOpen(true)} />
+            <AppointmentsView
+              key="appointments"
+              authToken={authToken}
+              onNewAppointment={() => setIsNewAppointmentModalOpen(true)}
+              services={services}
+              employees={employees}
+            />
           ) : activeTab === 'customers' ? (
-            <CustomersView 
-              key="customers" 
-              customers={customers}
-              onNewCustomer={() => setIsNewCustomerModalOpen(true)} 
+            <CustomersView
+              key="customers"
+              authToken={authToken}
+              onNewCustomer={() => setIsNewCustomerModalOpen(true)}
               onDeleteCustomer={(customer) => setCustomerToDelete(customer)}
             />
           ) : activeTab === 'employees' ? (
@@ -974,6 +988,7 @@ export default function App() {
             />
           ) : activeTab === 'settings' ? (
             <SettingsView
+              authToken={authToken}
               services={services}
               products={products}
               serviceCategories={serviceCategories}
@@ -989,7 +1004,7 @@ export default function App() {
             <MarketingView 
               key="marketing" 
               authToken={authToken}
-              customersCount={customers.length}
+              customersCount={customersTotal}
               onNewPromoCode={() => setIsNewPromoCodeModalOpen(true)} 
             />
           ) : null}
@@ -1012,6 +1027,7 @@ export default function App() {
       <AnimatePresence>
         {isNewCustomerModalOpen && (
           <NewCustomerModal
+            authToken={authToken}
             onClose={() => setIsNewCustomerModalOpen(false)}
             onSave={handleCreateCustomer}
             employees={employees}

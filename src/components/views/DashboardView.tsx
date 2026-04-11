@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Plus, ChevronDown } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -52,12 +52,13 @@ type DashboardAnalytics = {
 export function DashboardView({ authToken, onNewCustomer }: DashboardViewProps) {
   const [loading, setLoading] = useState(false);
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
+  const [chartRange, setChartRange] = useState<'week' | 'month' | 'year'>('week');
 
   useEffect(() => {
     if (!authToken) return;
     let cancelled = false;
     setLoading(true);
-    fetch('/api/analytics/dashboard', {
+    fetch(`/api/analytics/dashboard?chartRange=${chartRange}`, {
       headers: { Authorization: `Bearer ${authToken}` },
     })
       .then(async (r) => {
@@ -82,7 +83,7 @@ export function DashboardView({ authToken, onNewCustomer }: DashboardViewProps) 
     return () => {
       cancelled = true;
     };
-  }, [authToken]);
+  }, [authToken, chartRange]);
 
   const kpis = analytics?.kpis || { revenueToday: 0, ordersToday: 0, newCustomersThisMonth: 0 };
   const weeklyRevenueData = analytics?.weeklyRevenueData || [];
@@ -91,7 +92,7 @@ export function DashboardView({ authToken, onNewCustomer }: DashboardViewProps) 
   const topService = useMemo(() => serviceAllocationData?.[0]?.name || '—', [serviceAllocationData]);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -100,9 +101,9 @@ export function DashboardView({ authToken, onNewCustomer }: DashboardViewProps) 
       <div className="flex justify-between items-end mb-10">
         <div>
           <h2 className="text-4xl font-serif text-primary mb-2">Chào buổi sáng, Admin</h2>
-            <p className="text-stone-500">
-              Hôm nay là {formattedDate}
-            </p>
+          <p className="text-stone-500">
+            Hôm nay là {formattedDate}
+          </p>
         </div>
         <button
           onClick={onNewCustomer}
@@ -126,10 +127,36 @@ export function DashboardView({ authToken, onNewCustomer }: DashboardViewProps) 
 
       <div className="grid grid-cols-3 gap-8 mb-10">
         <div className="col-span-2 bg-white p-8 rounded-xl shadow-sm border border-stone-100">
-          <div className="flex justify-between items-center mb-8">
-            <h4 className="font-serif text-xl text-primary">Doanh thu theo tuần</h4>
-            <div className="flex items-center gap-1 text-xs font-bold text-stone-400 cursor-pointer">
-              7 ngày qua <ChevronDown size={14} />
+          <div className="flex justify-between items-center mb-8 overflow-visible relative z-20">
+            <h4 className="font-serif text-xl text-primary">
+              {chartRange === 'week' ? 'Doanh thu theo tuần' : chartRange === 'month' ? 'Doanh thu 30 ngày qua' : 'Doanh thu năm nay'}
+            </h4>
+            <div className="relative group">
+              <div className="flex items-center gap-1 text-xs font-bold text-stone-400 cursor-pointer hover:text-primary transition-colors py-2">
+                {chartRange === 'week' ? '7 ngày qua' : chartRange === 'month' ? '30 ngày qua' : 'Năm nay'} <ChevronDown size={14} />
+              </div>
+              <div className="absolute right-0 top-full mt-0 w-48 bg-white border border-stone-100 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                <button
+                  onClick={() => setChartRange('week')}
+                  className={cn("w-full text-left px-4 py-3 text-xs font-bold hover:bg-stone-50 hover:text-primary transition-colors rounded-t-lg", chartRange === 'week' ? "text-primary bg-stone-50/50" : "text-stone-500")}
+                >
+                  7 ngày qua
+                </button>
+                <div className="h-px bg-stone-50 w-full" />
+                <button
+                  onClick={() => setChartRange('month')}
+                  className={cn("w-full text-left px-4 py-3 text-xs font-bold hover:bg-stone-50 hover:text-primary transition-colors", chartRange === 'month' ? "text-primary bg-stone-50/50" : "text-stone-500")}
+                >
+                  30 ngày qua (Tháng)
+                </button>
+                <div className="h-px bg-stone-50 w-full" />
+                <button
+                  onClick={() => setChartRange('year')}
+                  className={cn("w-full text-left px-4 py-3 text-xs font-bold hover:bg-stone-50 hover:text-primary transition-colors rounded-b-lg", chartRange === 'year' ? "text-primary bg-stone-50/50" : "text-stone-500")}
+                >
+                  Năm nay
+                </button>
+              </div>
             </div>
           </div>
           <div className="h-[300px] w-full">
@@ -139,7 +166,7 @@ export function DashboardView({ authToken, onNewCustomer }: DashboardViewProps) 
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 700 }} dy={10} />
                 <YAxis hide />
                 <Tooltip cursor={{ fill: '#f9fafb' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Bar dataKey="value" fill="#4d0216" radius={[4, 4, 0, 0]} barSize={40} className="opacity-20 hover:opacity-100 transition-opacity" />
+                <Bar dataKey="value" fill="#4d0216" radius={[4, 4, 0, 0]} maxBarSize={40} className="opacity-20 hover:opacity-100 transition-opacity" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -175,47 +202,49 @@ export function DashboardView({ authToken, onNewCustomer }: DashboardViewProps) 
       </div>
 
       <div className="bg-white p-8 rounded-xl shadow-sm border border-stone-100">
-          <div className="flex justify-between items-center mb-8">
-            <h4 className="font-serif text-xl text-primary">Giao dịch hôm nay</h4>
-            <span className="text-stone-400 text-xs font-bold uppercase tracking-widest">
-              {todayOrders.length} giao dịch
-            </span>
-          </div>
-          <div className="max-h-[520px] overflow-y-auto rounded-xl border border-stone-100">
-            <table className="w-full text-left border-collapse">
-              <thead className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur-sm">
-                <tr className="border-b border-stone-100">
-                  <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Giờ</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Khách</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Thợ thực hiện</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Nội dung</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Trạng thái</th>
+        <div className="flex justify-between items-center mb-8">
+          <h4 className="font-serif text-xl text-primary">
+            {chartRange === 'week' ? 'Giao dịch 7 ngày qua' : chartRange === 'month' ? 'Giao dịch 30 ngày qua' : 'Giao dịch năm nay'}
+          </h4>
+          <span className="text-stone-400 text-xs font-bold uppercase tracking-widest">
+            {todayOrders.length} giao dịch gần nhất
+          </span>
+        </div>
+        <div className="max-h-[520px] overflow-y-auto rounded-xl border border-stone-100">
+          <table className="w-full text-left border-collapse">
+            <thead className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur-sm">
+              <tr className="border-b border-stone-100">
+                <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Thời gian</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Khách</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Thợ thực hiện</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Nội dung</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-50">
+              {todayOrders.map((apt) => (
+                <tr key={apt.id} className="hover:bg-stone-50/40 transition-colors">
+                  <td className="px-6 py-4 text-xs font-bold text-stone-500">{apt.time}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-primary">{apt.customer}</td>
+                  <td className="px-6 py-4 text-sm text-stone-600">{apt.stylist}</td>
+                  <td className="px-6 py-4 text-sm text-stone-600">{apt.service}</td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-600">
+                      Đã hoàn thành
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-50">
-                {todayOrders.map((apt) => (
-                  <tr key={apt.id} className="hover:bg-stone-50/40 transition-colors">
-                    <td className="px-6 py-4 text-xs font-bold text-stone-500">{apt.time}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-primary">{apt.customer}</td>
-                    <td className="px-6 py-4 text-sm text-stone-600">{apt.stylist}</td>
-                    <td className="px-6 py-4 text-sm text-stone-600">{apt.service}</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-600">
-                        Đã hoàn thành
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {!todayOrders.length && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center text-sm text-stone-400">
-                      Chưa có giao dịch trong hôm nay.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+              {!todayOrders.length && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-sm text-stone-400">
+                    Chưa có giao dịch trong thời gian này.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </motion.div>
   );

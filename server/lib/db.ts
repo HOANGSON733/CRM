@@ -14,8 +14,10 @@ export async function connectMongo() {
   await db.collection('product_categories').createIndex({ normalizedName: 1 }, { unique: true });
   await db.collection('pos_orders').createIndex({ createdAt: -1 });
   await db.collection('appointments').createIndex({ date: 1, time: 1, stylistId: 1 });
+  await db.collection('customer_sources').createIndex({ normalizedName: 1 }, { unique: true });
   await seedDefaultServiceCategories();
   await seedDefaultProductCategories();
+  await seedDefaultCustomerSources();
   await seedAdminUser();
   console.log(`MongoDB connected: ${config.dbName}`);
 }
@@ -75,6 +77,38 @@ async function seedDefaultServiceCategories() {
       },
       { upsert: true }
     );
+  }
+}
+
+const DEFAULT_CUSTOMER_SOURCE_NAMES = [
+  'Facebook',
+  'Instagram',
+  'TikTok',
+  'Zalo',
+  'Google / Website',
+  'Người quen giới thiệu',
+  'Vãng lai',
+];
+
+async function seedDefaultCustomerSources() {
+  const col = currentDb().collection('customer_sources');
+  let order = 0;
+  for (const name of DEFAULT_CUSTOMER_SOURCE_NAMES) {
+    const normalizedName = name.toLowerCase();
+    await col.updateOne(
+      { normalizedName },
+      {
+        $setOnInsert: {
+          name,
+          normalizedName,
+          sortOrder: order,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+    order += 1;
   }
 }
 

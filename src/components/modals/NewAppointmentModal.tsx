@@ -19,15 +19,32 @@ interface NewAppointmentModalProps {
   authToken: string | null;
   services: Service[];
   employees: Employee[];
+  initialData?: {
+    id: string;
+    customerName: string;
+    customerPhone?: string;
+    serviceId?: string;
+    stylistId?: string;
+    date: string;
+    time: string;
+    notes?: string;
+    smsReminder?: boolean;
+    status?: string;
+  } | null;
+  onSaved?: () => void;
 }
 
-export function NewAppointmentModal({ onClose, authToken, services, employees }: NewAppointmentModalProps) {
+export function NewAppointmentModal({ onClose, authToken, services, employees, initialData = null, onSaved }: NewAppointmentModalProps) {
   const now = new Date();
+  const isEditMode = Boolean(initialData?.id);
+  const initialDate = initialData?.date && /^\d{4}-\d{2}-\d{2}$/.test(initialData.date)
+    ? new Date(`${initialData.date}T00:00:00`)
+    : now;
   const [viewMonthDate, setViewMonthDate] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
   const [selectedService, setSelectedService] = useState<string>(() => String(services[0]?.id || ''));
   const [selectedStylist, setSelectedStylist] = useState<string>(() => String(employees[0]?.id || 'any'));
   const [selectedTime, setSelectedTime] = useState('11:00');
-  const [selectedDate, setSelectedDate] = useState<Date>(now);
+  const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [customerQuery, setCustomerQuery] = useState('');
   const [notes, setNotes] = useState('');
   const [smsReminder, setSmsReminder] = useState(true);
@@ -50,6 +67,28 @@ export function NewAppointmentModal({ onClose, authToken, services, employees }:
   const selectedDateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
   const disabledSlots = useMemo(() => new Set(bookedSlots), [bookedSlots]);
   const currentMonthYear = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(viewMonthDate);
+
+  useEffect(() => {
+    const nextDate = initialData?.date && /^\d{4}-\d{2}-\d{2}$/.test(initialData.date)
+      ? new Date(`${initialData.date}T00:00:00`)
+      : now;
+    setViewMonthDate(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+    setSelectedDate(nextDate);
+    setSelectedTime(initialData?.time || '11:00');
+    setCustomerQuery(initialData?.customerName || '');
+    setNotes(initialData?.notes || '');
+    setSmsReminder(initialData?.smsReminder ?? true);
+    setSelectedService(
+      initialData?.serviceId && services.some((s) => String(s.id) === String(initialData.serviceId))
+        ? String(initialData.serviceId)
+        : String(services[0]?.id || '')
+    );
+    setSelectedStylist(
+      initialData?.stylistId && employees.some((e) => String(e.id) === String(initialData.stylistId))
+        ? String(initialData.stylistId)
+        : (initialData?.stylistId ? 'any' : String(employees[0]?.id || 'any'))
+    );
+  }, [initialData, services, employees]);
 
   const calendarDays = useMemo(() => {
     const year = viewMonthDate.getFullYear();
@@ -93,6 +132,7 @@ export function NewAppointmentModal({ onClose, authToken, services, employees }:
         const data = await response.json();
         const appointments = Array.isArray(data?.appointments) ? data.appointments : [];
         const occupiedTimes = appointments
+          .filter((item: any) => String(item?.id || '') !== String(initialData?.id || ''))
           .filter((item: any) => {
             if (!selectedStylist || selectedStylist === 'any') return true;
             return String(item?.stylistId || '') === String(selectedStylist);
@@ -129,8 +169,10 @@ export function NewAppointmentModal({ onClose, authToken, services, employees }:
     setError(null);
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/appointments', {
-        method: 'POST',
+      const endpoint = isEditMode ? `/api/appointments/${initialData?.id}` : '/api/appointments';
+      const method = isEditMode ? 'PUT' : 'POST';
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${authToken}`,
@@ -147,20 +189,22 @@ export function NewAppointmentModal({ onClose, authToken, services, employees }:
           durationMinutes: Number((selectedServiceObj.duration || '').match(/\d+/)?.[0] || 60),
           notes: notes.trim(),
           smsReminder,
+          status: initialData?.status || 'confirmed',
         }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        throw new Error(data?.message || 'Không thể đặt lịch hẹn.');
+        throw new Error(data?.message || (isEditMode ? 'Không thể cập nhật lịch hẹn.' : 'Không thể đặt lịch hẹn.'));
       }
       window.dispatchEvent(new Event('appointments:changed'));
+      onSaved?.();
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
       }, 1200);
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Không thể đặt lịch hẹn.';
+      const message = e instanceof Error ? e.message : (isEditMode ? 'Không thể cập nhật lịch hẹn.' : 'Không thể đặt lịch hẹn.');
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -184,7 +228,7 @@ export function NewAppointmentModal({ onClose, authToken, services, employees }:
       >
         {/* Modal Header */}
         <div className="p-10 pb-6 flex justify-between items-center">
-          <h2 className="text-3xl font-serif text-primary">Đặt Lịch Hẹn Mới</h2>
+          <h2 className="text-3xl font-serif text-primary">{isEditMode ? 'Chỉnh Sửa Lịch Hẹn' : 'Đặt Lịch Hẹn Mới'}</h2>
           <button onClick={onClose} className="p-2 text-stone-400 hover:text-stone-600 transition-colors">
             <X size={24} />
           </button>
@@ -216,36 +260,43 @@ export function NewAppointmentModal({ onClose, authToken, services, employees }:
             <div className="space-y-4">
               <label className="text-[11px] font-bold text-stone-400 uppercase tracking-widest">DỊCH VỤ</label>
               <div className="space-y-3">
-                {services.map((s) => (
-                  <div 
-                    key={String(s.id)}
-                    onClick={() => setSelectedService(String(s.id))}
-                    className={cn(
-                      "p-5 rounded-2xl border-2 transition-all cursor-pointer flex justify-between items-center group",
-                      String(selectedService) === String(s.id) ? "border-primary bg-primary/[0.02]" : "border-stone-50 bg-stone-50 hover:border-stone-200"
-                    )}
-                  >
-                    <div>
-                      <p className="text-sm font-bold text-primary mb-1">{s.name}</p>
-                      <p className="text-[11px] text-stone-400">{s.duration} • {s.price}₫</p>
-                    </div>
-                    {String(selectedService) === String(s.id) ? (
-                      <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center text-white">
-                        <CheckCircle2 size={14} />
+                {services.length > 0 ? (
+                  <div className="max-h-[23rem] overflow-y-auto pr-1 -mr-1 space-y-3 scroll-smooth [scrollbar-width:thin]">
+                    {services.map((s) => (
+                      <div
+                        key={String(s.id)}
+                        onClick={() => setSelectedService(String(s.id))}
+                        className={cn(
+                          'p-5 rounded-2xl border-2 transition-all cursor-pointer flex justify-between items-center group shrink-0',
+                          String(selectedService) === String(s.id)
+                            ? 'border-primary bg-primary/[0.02]'
+                            : 'border-stone-50 bg-stone-50 hover:border-stone-200'
+                        )}
+                      >
+                        <div>
+                          <p className="text-sm font-bold text-primary mb-1">{s.name}</p>
+                          <p className="text-[11px] text-stone-400">
+                            {s.duration} • {s.price}₫
+                          </p>
+                        </div>
+                        {String(selectedService) === String(s.id) ? (
+                          <div className="w-6 h-6 bg-secondary rounded-full flex items-center justify-center text-white">
+                            <CheckCircle2 size={14} />
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6 border-2 border-stone-200 rounded-full flex items-center justify-center text-stone-300 group-hover:border-stone-400">
+                            <Plus size={14} />
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="w-6 h-6 border-2 border-stone-200 rounded-full flex items-center justify-center text-stone-300 group-hover:border-stone-400">
-                        <Plus size={14} />
-                      </div>
-                    )}
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className="text-sm text-stone-400">Chưa có dịch vụ trong hệ thống.</p>
+                )}
                 <button className="w-full py-4 border-2 border-dashed border-stone-200 rounded-2xl text-[11px] font-bold text-stone-400 uppercase tracking-widest hover:border-stone-400 hover:text-stone-600 transition-all">
                   + Thêm dịch vụ khác
                 </button>
-                {!services.length && (
-                  <p className="text-sm text-stone-400">Chưa có dịch vụ trong hệ thống.</p>
-                )}
               </div>
             </div>
 
@@ -455,7 +506,7 @@ export function NewAppointmentModal({ onClose, authToken, services, employees }:
                 isSubmitting ? "bg-stone-300 text-stone-600 cursor-not-allowed shadow-none" : "bg-primary text-white hover:bg-primary-light"
               )}
             >
-              {isSubmitting ? 'Đang xác nhận...' : 'Xác nhận đặt lịch'}
+              {isSubmitting ? (isEditMode ? 'Đang cập nhật...' : 'Đang xác nhận...') : (isEditMode ? 'Lưu thay đổi' : 'Xác nhận đặt lịch')}
             </button>
           </div>
         </div>
@@ -479,7 +530,7 @@ export function NewAppointmentModal({ onClose, authToken, services, employees }:
               </div>
               <div>
                 <p className="text-sm font-bold text-primary">Thành công</p>
-                <p className="text-xs text-stone-500">Đã xác nhận đặt lịch hẹn thành công.</p>
+                <p className="text-xs text-stone-500">{isEditMode ? 'Đã cập nhật lịch hẹn thành công.' : 'Đã xác nhận đặt lịch hẹn thành công.'}</p>
               </div>
               <button onClick={() => setShowSuccess(false)} className="ml-4 text-stone-300 hover:text-stone-500">
                 <X size={16} />

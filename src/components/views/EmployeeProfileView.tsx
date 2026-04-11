@@ -1,14 +1,14 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { 
-  Phone, 
+import {
+  Phone,
   Mail,
-  Calendar as CalendarIcon, 
-  Star, 
-  Award, 
-  ChevronLeft, 
-  Clock, 
-  CheckCircle2, 
+  Calendar as CalendarIcon,
+  Star,
+  Award,
+  ChevronLeft,
+  Clock,
+  CheckCircle2,
   Edit3,
   UserMinus
 } from 'lucide-react';
@@ -35,14 +35,14 @@ function getInitials(name: string) {
 
 export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTerminate }: EmployeeProfileViewProps) {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
       className="p-10 space-y-12"
     >
       {/* Profile Header */}
-      <div className="bg-white rounded-[3rem] shadow-xl border border-stone-100 overflow-hidden flex h-[500px]">
+      <div className="bg-white rounded-[3rem] shadow-xl border border-stone-100 overflow-hidden flex min-h-[500px] h-auto">
         <div className="w-1/3 relative overflow-hidden">
           {employee.avatar ? (
             <img src={employee.avatar} alt={employee.name} className="w-full h-full object-cover" />
@@ -51,7 +51,7 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
               <span className="text-7xl font-serif text-primary">{getInitials(employee.name)}</span>
             </div>
           )}
-          <button 
+          <button
             onClick={onBack}
             className="absolute top-8 left-8 w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 hover:bg-white/40 transition-all"
           >
@@ -66,7 +66,7 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
               {employee.bio}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
               <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Số điện thoại</p>
               <p className="text-sm font-bold text-primary flex items-center gap-2">
@@ -82,6 +82,10 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
               </p>
             </div>
             <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Ngày sinh</p>
+              <p className="text-sm font-bold text-primary">{employee.birthday || 'Chưa cập nhật'}</p>
+            </div>
+            <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
               <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Ngày bắt đầu</p>
               <p className="text-sm font-bold text-primary">{employee.startDate || 'Chưa cập nhật'}</p>
             </div>
@@ -89,9 +93,29 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
               <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Ca mặc định</p>
               <p className="text-sm font-bold text-primary">{employee.defaultShift || 'Chưa cập nhật'}</p>
             </div>
+            <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Tình trạng</p>
+              <p className="text-sm font-bold text-primary truncate">
+                {employee.status === 'terminated' 
+                  ? 'Nghỉ việc' 
+                  : employee.status === 'on-leave' 
+                    ? 'Tạm nghỉ' 
+                    : employee.status === 'busy' 
+                      ? 'Đang phục vụ' 
+                      : 'Đang rảnh'}
+              </p>
+            </div>
+            <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1 col-span-2">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Chuyên môn</p>
+              <p className="text-sm font-bold text-primary truncate">{employee.specialties?.length ? employee.specialties.join(', ') : 'Chưa cập nhật'}</p>
+            </div>
+            <div className="bg-stone-50 rounded-2xl px-5 py-4 space-y-1">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Tỷ lệ hoa hồng</p>
+              <p className="text-sm font-bold text-primary">{employee.commissionRate || 0}%</p>
+            </div>
           </div>
           <div className="flex gap-4">
-            <button 
+            <button
               onClick={onAddShift}
               className="bg-primary text-white px-10 py-5 rounded-2xl text-sm font-bold flex items-center gap-3 shadow-2xl hover:bg-primary-light transition-all active:scale-95"
             >
@@ -105,13 +129,15 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
               <Edit3 size={20} />
               Sửa Thông Tin
             </button>
-            <button 
-              onClick={onTerminate}
-              className="bg-red-50 text-red-600 px-10 py-5 rounded-2xl text-sm font-bold flex items-center gap-3 hover:bg-red-100 transition-all"
-            >
-              <UserMinus size={20} />
-              Xin nghỉ 
-            </button>
+            {employee.status !== 'terminated' && (
+              <button
+                onClick={onTerminate}
+                className="bg-red-50 text-red-600 px-10 py-5 rounded-2xl text-sm font-bold flex items-center gap-3 hover:bg-red-100 transition-all"
+              >
+                <UserMinus size={20} />
+                Xin nghỉ
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -124,7 +150,7 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
             <h4 className="text-[11px] font-bold uppercase tracking-widest text-stone-400">DOANH THU THÁNG NÀY</h4>
           </div>
           <div className="flex items-end gap-2">
-            <h3 className="text-5xl font-serif text-primary">{employee.monthlyRevenue}</h3>
+            <h3 className="text-5xl font-serif text-primary">{employee.monthlyRevenue || '0'}</h3>
             <span className="text-stone-400 font-bold mb-1.5">VND</span>
           </div>
           <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
@@ -138,7 +164,7 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
             <h4 className="text-[11px] font-bold uppercase tracking-widest text-stone-400">ĐÁNH GIÁ TB</h4>
           </div>
           <div className="flex items-end gap-2">
-            <h3 className="text-5xl font-serif text-primary">{employee.rating}/5.0</h3>
+            <h3 className="text-5xl font-serif text-primary">{employee.rating || '5.0'}/5.0</h3>
           </div>
           <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
             <div className="h-full bg-secondary" style={{ width: '98%' }}></div>
@@ -151,7 +177,7 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
             <h4 className="text-[11px] font-bold uppercase tracking-widest text-stone-400">TỶ LỆ REBOOKING</h4>
           </div>
           <div className="flex items-end gap-2">
-            <h3 className="text-5xl font-serif text-primary">{employee.rebookingRate}</h3>
+            <h3 className="text-5xl font-serif text-primary">{employee.rebookingRate || '0%'}</h3>
           </div>
           <div className="w-full h-1.5 bg-stone-100 rounded-full overflow-hidden">
             <div className="h-full bg-secondary" style={{ width: '82%' }}></div>
@@ -164,10 +190,18 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
         <div className="col-span-2 space-y-8">
           <div className="flex justify-between items-end">
             <h3 className="text-3xl font-serif text-primary">Lịch Làm Việc Tuần</h3>
-            <p className="text-stone-400 text-sm font-bold uppercase tracking-widest">Tháng 10, 2023</p>
+            <p className="text-stone-400 text-sm font-bold uppercase tracking-widest">Tháng {new Date().getMonth() + 1}, {new Date().getFullYear()}</p>
           </div>
           <div className="bg-white rounded-[2.5rem] shadow-sm border border-stone-100 overflow-hidden flex divide-x divide-stone-100">
-            {employee.weeklySchedule?.map((day, i) => (
+            {(employee.weeklySchedule?.length ? employee.weeklySchedule : [
+              { day: 'T2', shift: employee.defaultShift || 'Ca Sáng', time: '08:00 - 16:00' },
+              { day: 'T3', shift: employee.defaultShift || 'Ca Sáng', time: '08:00 - 16:00' },
+              { day: 'T4', shift: employee.defaultShift || 'Ca Sáng', time: '08:00 - 16:00' },
+              { day: 'T5', shift: 'NGHỈ PHÉP', time: '-' },
+              { day: 'T6', shift: employee.defaultShift || 'Ca Sáng', time: '08:00 - 16:00' },
+              { day: 'T7', shift: 'Ca Tăng Cường', time: '08:00 - 20:00', type: 'danger' },
+              { day: 'CN', shift: 'Ca Tăng Cường', time: '08:00 - 20:00', type: 'danger' },
+            ]).map((day, i) => (
               <div key={i} className="flex-1 min-h-[180px] flex flex-col">
                 <div className="p-4 text-center border-b border-stone-50 bg-stone-50/50">
                   <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">{day.day}</span>
@@ -196,20 +230,33 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
           <h3 className="text-3xl font-serif text-primary">Hoa Hồng</h3>
           <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-stone-100 space-y-8">
             <div className="space-y-6">
-              {employee.commissions?.map((comm, i) => (
-                <div key={i} className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-bold text-primary">{comm.service}</p>
-                    <p className="text-[10px] text-stone-400 font-bold uppercase">{comm.count} DỊCH VỤ x 10%</p>
+              {employee.commissions?.length ? (
+                employee.commissions.map((comm, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-bold text-primary">{comm.service}</p>
+                      <p className="text-[10px] text-stone-400 font-bold uppercase">{comm.count} DỊCH VỤ x {employee.commissionRate || 0}%</p>
+                    </div>
+                    <span className="text-sm font-serif text-primary">{comm.amount}</span>
                   </div>
-                  <span className="text-sm font-serif text-primary">{comm.amount}</span>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-stone-400 text-sm font-medium">Chưa có dữ liệu hoa hồng tháng này.</p>
                 </div>
-              ))}
+              )}
             </div>
             <div className="pt-8 border-t border-stone-100 flex justify-between items-end">
               <div>
                 <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỔNG TẠM TÍNH</p>
-                <p className="text-3xl font-serif text-primary">10.500k</p>
+                <p className="text-3xl font-serif text-primary">
+                  {employee.commissions?.length 
+                    ? employee.commissions.reduce((acc, curr) => {
+                        const amt = parseFloat(curr.amount.replace(/[^0-9]/g, ''));
+                        return acc + (isNaN(amt) ? 0 : amt);
+                      }, 0).toLocaleString() + 'k'
+                    : '0k'}
+                </p>
               </div>
               <button className="text-[10px] font-bold text-secondary uppercase tracking-widest hover:underline">Chi Tiết Bảng Lương</button>
             </div>
@@ -221,17 +268,21 @@ export function EmployeeProfileView({ employee, onBack, onAddShift, onEdit, onTe
       <div className="space-y-8">
         <h3 className="text-3xl font-serif text-primary">Chứng Chỉ Chuyên Môn</h3>
         <div className="grid grid-cols-3 gap-8">
-          {employee.certificates?.map((cert, i) => (
-            <div key={i} className="bg-white p-8 rounded-[2rem] shadow-sm border border-stone-100 flex items-center gap-6 group hover:border-secondary/20 transition-all">
-              <div className="w-14 h-14 bg-stone-50 rounded-2xl flex items-center justify-center text-secondary group-hover:scale-110 transition-transform">
-                <Award size={28} />
+          {employee.certificates?.length ? (
+            employee.certificates.map((cert, i) => (
+              <div key={i} className="bg-white p-8 rounded-[2rem] shadow-sm border border-stone-100 flex items-center gap-6 group hover:border-secondary/20 transition-all">
+                <div className="w-14 h-14 bg-stone-50 rounded-2xl flex items-center justify-center text-secondary group-hover:scale-110 transition-transform">
+                  <Award size={28} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-primary">{cert.title}</p>
+                  <p className="text-[10px] text-stone-400 font-medium italic">{cert.location}</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-primary">{cert.title}</p>
-                <p className="text-[10px] text-stone-400 font-medium italic">{cert.location}</p>
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="col-span-3 text-stone-400 text-sm font-medium py-4">Chưa có chứng chỉ chuyên môn nào được thêm.</div>
+          )}
         </div>
       </div>
     </motion.div>

@@ -6,6 +6,7 @@ export interface Customer {
   tags: string[];
   phone: string;
   email: string;
+  source?: string;
   lastVisit: string;
   avatar: string;
   memberSince?: string;
@@ -49,6 +50,7 @@ export interface Employee {
   avatar: string;
   status: 'available' | 'busy' | 'on-leave' | 'terminated';
   specialties: string[];
+  birthday?: string;
   startDate?: string;
   defaultShift?: string;
   bio?: string;
