@@ -26,6 +26,7 @@ import {
 } from 'recharts';
 import { KPICard } from '../KPICard';
 import { cn } from '../../lib/utils';
+import { CustomerSourceIcon, normalizeCustomerSourceIcon } from '../../lib/customerSourceIcons';
 import { Customer } from '../../types';
 
 interface CustomersViewProps {
@@ -48,6 +49,7 @@ export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer }: Cu
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [listRefreshKey, setListRefreshKey] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [sourceIconByName, setSourceIconByName] = useState<Record<string, string>>({});
   const searchCommittedRef = useRef(false);
 
   /**
@@ -122,6 +124,34 @@ export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer }: Cu
     window.addEventListener('customers:changed', handler);
     return () => window.removeEventListener('customers:changed', handler);
   }, []);
+
+  useEffect(() => {
+    if (!authToken) {
+      setSourceIconByName({});
+      return;
+    }
+    const loadSources = () => {
+      fetch('/api/customer-sources', {
+        headers: { Authorization: `Bearer ${authToken}` },
+        cache: 'no-store',
+      })
+        .then(async (r) => {
+          const data = await r.json().catch(() => null);
+          if (!r.ok) return;
+          const map: Record<string, string> = {};
+          for (const s of Array.isArray(data?.sources) ? data.sources : []) {
+            const name = String((s as { name?: string }).name || '').trim();
+            if (!name) continue;
+            map[name] = normalizeCustomerSourceIcon((s as { icon?: string }).icon);
+          }
+          setSourceIconByName(map);
+        })
+        .catch(() => {});
+    };
+    loadSources();
+    window.addEventListener('customer-sources:changed', loadSources);
+    return () => window.removeEventListener('customer-sources:changed', loadSources);
+  }, [authToken]);
 
   useEffect(() => {
     setSelectedCustomer((prev) => {
@@ -295,9 +325,23 @@ export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer }: Cu
                         <p className="text-[10px] text-stone-400">{customer.email}</p>
                       </td>
                       <td className="px-8 py-5">
-                        <span className="text-xs font-medium text-stone-600">
-                          {customer.source?.trim() ? customer.source : '—'}
-                        </span>
+                        {(() => {
+                          const label = customer.source?.trim() || '';
+                          if (!label) {
+                            return <span className="text-xs font-medium text-stone-600">—</span>;
+                          }
+                          const iconId = sourceIconByName[label];
+                          return (
+                            <span className="inline-flex items-center gap-2 text-xs font-medium text-stone-600">
+                              {iconId !== undefined && (
+                                <span className="text-primary shrink-0 inline-flex" aria-hidden>
+                                  <CustomerSourceIcon iconId={iconId} size={14} />
+                                </span>
+                              )}
+                              {label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-8 py-5">
                         <p className="text-xs font-medium text-stone-600">{customer.lastVisit}</p>
@@ -458,9 +502,23 @@ export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer }: Cu
                     <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
                       Nguồn biết đến
                     </p>
-                    <p className="text-sm font-bold text-primary">
-                      {selectedCustomer.source?.trim() ? selectedCustomer.source : '—'}
-                    </p>
+                    {(() => {
+                      const label = selectedCustomer.source?.trim() || '';
+                      if (!label) {
+                        return <p className="text-sm font-bold text-primary">—</p>;
+                      }
+                      const iconId = sourceIconByName[label];
+                      return (
+                        <p className="text-sm font-bold text-primary inline-flex items-center gap-2">
+                          {iconId !== undefined && (
+                            <span className="text-secondary shrink-0 inline-flex" aria-hidden>
+                              <CustomerSourceIcon iconId={iconId} size={16} />
+                            </span>
+                          )}
+                          {label}
+                        </p>
+                      );
+                    })()}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
