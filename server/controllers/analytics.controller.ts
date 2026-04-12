@@ -422,6 +422,46 @@ export async function getReportsAnalytics(req: Request, res: Response) {
   }
 }
 
+export async function getStaffRecentActivities(req: Request, res: Response) {
+  try {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+
+    const now = new Date();
+    const from = startOfDay(new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000));
+    const to = endOfDay(now);
+    const orders = currentDb().collection('pos_orders');
+
+    const recentOrders = await orders
+      .find({ createdAt: { $gte: from, $lte: to } })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .toArray();
+
+    const activities = recentOrders.flatMap((o) => {
+      const createdAt = o?.createdAt ? new Date(o.createdAt) : new Date();
+      const time = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(createdAt);
+      const items = Array.isArray(o?.items) ? o.items : [];
+      const serviceNames = items
+        .filter((it: any) => it?.type === 'service')
+        .map((it: any) => String(it?.name || ''))
+        .filter(Boolean);
+      const staffNames = Array.from(new Set(items.map((it: any) => String(it?.staff || '')).filter(Boolean)));
+
+      return staffNames.map((staff, idx) => ({
+        id: `${String(o?._id || '')}-${idx}`,
+        staffName: staff,
+        text: `vừa hoàn thành ${serviceNames.slice(0, 2).join(', ') || 'dịch vụ'} lúc ${time}.`,
+        createdAt,
+      }));
+    }).slice(0, 10);
+
+    return res.json({ ok: true, activities });
+  } catch (_error) {
+    return res.status(400).json({ message: 'Không thể tải hoạt động mới của nhân viên.' });
+  }
+}
+
 export async function getStaffPerformance(req: Request, res: Response) {
   try {
     const auth = requireAuth(req, res);

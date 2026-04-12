@@ -63,6 +63,7 @@ type CheckoutItem = {
   name: string;
   quantity: number;
   unitPrice: number;
+  discountAmount?: number;
   staff?: string;
 };
 
@@ -86,6 +87,7 @@ export async function checkoutPosOrder(req: Request, res: Response) {
           name: String(i?.name || ''),
           quantity: Number(i?.quantity || 0),
           unitPrice: Number(i?.unitPrice || 0),
+          discountAmount: Number(i?.discountAmount || 0),
           staff: i?.staff ? String(i.staff) : undefined,
         }))
       : [];
@@ -101,9 +103,20 @@ export async function checkoutPosOrder(req: Request, res: Response) {
       if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
         return res.status(400).json({ message: 'Đơn giá không hợp lệ.' });
       }
+      if (!Number.isFinite(item.discountAmount) || Number(item.discountAmount) < 0) {
+        return res.status(400).json({ message: 'Giảm giá theo dòng không hợp lệ.' });
+      }
+      if (Number(item.discountAmount) > item.unitPrice * item.quantity) {
+        return res.status(400).json({ message: 'Giảm giá theo dòng vượt quá thành tiền dòng.' });
+      }
     }
 
-    const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+    const lineItemsTotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+    const lineDiscountTotal = items.reduce(
+      (sum, i) => sum + Math.min(i.unitPrice * i.quantity, Math.max(0, Math.round(Number(i.discountAmount || 0)))),
+      0
+    );
+    const subtotal = lineItemsTotal - lineDiscountTotal;
 
     let discount = 0;
     if (!isWalkIn && customerIdRaw && ObjectId.isValid(customerIdRaw)) {
@@ -148,6 +161,8 @@ export async function checkoutPosOrder(req: Request, res: Response) {
       tipPercent: Number.isFinite(tipPercent) ? tipPercent : 0,
       isVatEnabled,
       totals: {
+        lineItemsTotal,
+        lineDiscountTotal,
         subtotal,
         discount,
         tipAmount,
@@ -161,8 +176,11 @@ export async function checkoutPosOrder(req: Request, res: Response) {
         name: i.name,
         quantity: i.quantity,
         unitPrice: i.unitPrice,
+        discountAmount: Math.max(0, Math.round(Number(i.discountAmount || 0))),
         staff: i.staff || '',
         lineTotal: i.unitPrice * i.quantity,
+        lineDiscount: Math.min(i.unitPrice * i.quantity, Math.max(0, Math.round(Number(i.discountAmount || 0)))),
+        lineNetTotal: Math.max(0, Math.round(i.unitPrice * i.quantity - Math.min(i.unitPrice * i.quantity, Math.max(0, Math.round(Number(i.discountAmount || 0)))))),
       })),
       createdBy: {
         userId: authPayload.sub ? String(authPayload.sub) : '',

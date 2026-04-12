@@ -37,7 +37,28 @@ interface OrderItem {
   staff?: string;
   quantity: number;
   price: number;
+  discountAmount: number;
   type: 'service' | 'product';
+}
+
+interface InvoiceSnapshot {
+  customerName: string;
+  paymentMethod: 'cash' | 'card' | 'qr' | 'voucher';
+  receivedAmount: number;
+  change: number;
+  lineItemsTotal: number;
+  lineDiscountTotal: number;
+  vipDiscount: number;
+  tipAmount: number;
+  vat: number;
+  total: number;
+  items: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    discountAmount: number;
+    lineTotal: number;
+  }>;
 }
 
 function hasVipTag(customer: Customer | null) {
@@ -58,6 +79,8 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
   const [isWalkIn, setIsWalkIn] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [checkoutOrderId, setCheckoutOrderId] = useState<string | null>(null);
+  const [lastInvoice, setLastInvoice] = useState<InvoiceSnapshot | null>(null);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
   const [customerQuery, setCustomerQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -127,7 +150,12 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
     );
   }, [posProducts, productSearch]);
 
-  const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const lineItemsTotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const lineDiscountTotal = orderItems.reduce(
+    (sum, item) => sum + Math.min(item.price * item.quantity, Math.max(0, Math.round(item.discountAmount || 0))),
+    0
+  );
+  const subtotal = lineItemsTotal - lineDiscountTotal;
   const discount =
     !isWalkIn && selectedCustomer && hasVipTag(selectedCustomer) ? subtotal * 0.1 : 0;
   const afterDiscount = subtotal - discount;
@@ -186,6 +214,14 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
 
   const handleClear = () => setReceivedAmount('0');
 
+  const handleBackspace = () => {
+    setReceivedAmount((prev) => {
+      if (prev.length <= 1) return '0';
+      const next = prev.slice(0, -1);
+      return next.length ? next : '0';
+    });
+  };
+
   const handleQuickAmount = (amount: number) => {
     setReceivedAmount(String(amount));
   };
@@ -202,6 +238,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
         staff: defaultStaffName,
         quantity: 1,
         price: unit || 0,
+        discountAmount: 0,
         type: 'service',
       },
     ]);
@@ -211,7 +248,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
 
   const addProductLine = (product: Product) => {
     if (product.stock <= 0) {
-      alert('Sản phẩm đã hết hàng.');
+      setNoticeMessage('Sản phẩm đã hết hàng.');
       return;
     }
     const unit = parseVndPrice(product.sellingPrice);
@@ -225,6 +262,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
         staff: defaultStaffName,
         quantity: 1,
         price: unit || 0,
+        discountPercent: 0,
         type: 'product',
       },
     ]);
@@ -255,16 +293,16 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
 
   const confirmPayment = () => {
     if (!orderItems.length) {
-      alert('Vui lòng thêm ít nhất một dòng dịch vụ hoặc sản phẩm.');
+      setNoticeMessage('Vui lòng thêm ít nhất một dòng dịch vụ hoặc sản phẩm.');
       return;
     }
     if (paymentMethod === 'cash' && receivedNum < total) {
-      alert('Số tiền nhận chưa đủ để thanh toán. Bạn có thể bấm CHẴN TIỀN để tự điền nhanh.');
+      setNoticeMessage('Số tiền nhận chưa đủ để thanh toán. Bạn có thể bấm CHẴN TIỀN để tự điền nhanh.');
       return;
     }
     (async () => {
       if (!authToken) {
-        alert('Phiên đăng nhập không hợp lệ.');
+        setNoticeMessage('Phiên đăng nhập không hợp lệ.');
         return;
       }
 
@@ -288,6 +326,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
             name: i.name,
             quantity: i.quantity,
             unitPrice: i.price,
+            discountAmount: Math.max(0, Math.round(i.discountAmount || 0)),
             staff: i.staff,
           })),
         }),
@@ -295,7 +334,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        alert(data?.message || 'Không thể thanh toán POS.');
+        setNoticeMessage(data?.message || 'Không thể thanh toán POS.');
         return;
       }
 
@@ -304,18 +343,43 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
       if (data?.customer && typeof data.customer === 'object') {
         setSelectedCustomer(data.customer);
       }
+
+      setLastInvoice({
+        customerName: customerDisplayName,
+        paymentMethod,
+        receivedAmount: receivedNum,
+        change: paymentMethod === 'cash' ? receivedNum - total : 0,
+        lineItemsTotal,
+        lineDiscountTotal,
+        vipDiscount: discount,
+        tipAmount,
+        vat,
+        total,
+        items: orderItems.map((i) => {
+          const lineGross = i.price * i.quantity;
+          const lineDiscount = Math.min(lineGross, Math.max(0, Math.round(i.discountAmount || 0)));
+          return {
+            name: i.name,
+            quantity: i.quantity,
+            unitPrice: i.price,
+            discountAmount: lineDiscount,
+            lineTotal: lineGross - lineDiscount,
+          };
+        }),
+      });
+
       await refreshPosProducts();
       onCheckoutSuccess?.();
       setIsSuccessModalOpen(true);
     })().catch((e) => {
       const msg = e instanceof Error ? e.message : 'Không thể thanh toán POS.';
-      alert(msg);
+      setNoticeMessage(msg);
     });
   };
 
   return (
-    <div className="flex h-full bg-[#f8f5f0] overflow-hidden min-h-[calc(100vh-6rem)]">
-      <div className="flex-1 flex flex-col p-8 space-y-6 overflow-y-auto">
+    <div className="flex h-[calc(100vh-6rem)] bg-[#f8f5f0] overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col p-8 space-y-6 overflow-y-auto">
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-stone-100 flex flex-wrap items-center gap-6">
           <div className="w-16 h-16 bg-stone-100 rounded-full overflow-hidden flex items-center justify-center text-stone-400 shrink-0">
             {selectedCustomer ? (
@@ -426,6 +490,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
                   <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">TÊN</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">THỢ PHỤ TRÁCH</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest w-32">SL</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest w-40">GIẢM (₫)</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest text-right">
                     THÀNH TIỀN
                   </th>
@@ -435,7 +500,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
               <tbody className="divide-y divide-stone-50">
                 {orderItems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-sm text-stone-400">
+                    <td colSpan={7} className="px-6 py-12 text-center text-sm text-stone-400">
                       Chưa có dòng nào. Nhấn <span className="font-bold text-primary">+ Dịch vụ</span> hoặc{' '}
                       <span className="font-bold text-primary">+ Sản phẩm</span>.
                     </td>
@@ -488,8 +553,27 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
                           </button>
                         </div>
                       </td>
+                      <td className="px-6 py-4">
+                        <input
+                          type="number"
+                          min={0}
+                          value={item.discountAmount || 0}
+                          onChange={(e) => {
+                            const next = Number(e.target.value || 0);
+                            const lineTotal = item.price * item.quantity;
+                            setOrderItems((prev) =>
+                              prev.map((x) =>
+                                x.id === item.id
+                                  ? { ...x, discountAmount: Math.max(0, Math.min(lineTotal, Number.isFinite(next) ? Math.round(next) : 0)) }
+                                  : x
+                              )
+                            );
+                          }}
+                          className="w-28 bg-stone-100 text-stone-700 px-2 py-1.5 rounded-lg text-xs font-bold border border-transparent focus:border-primary/20 outline-none"
+                        />
+                      </td>
                       <td className="px-6 py-4 text-sm font-bold text-primary text-right">
-                        {formatVnd(item.price * item.quantity)}đ
+                        {formatVnd(Math.max(0, Math.round(item.price * item.quantity - Math.min(item.price * item.quantity, Math.max(0, item.discountAmount || 0)))))}đ
                       </td>
                       <td className="px-6 py-4">
                         <button
@@ -510,7 +594,15 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
           <div className="p-8 bg-stone-50/50 border-t border-stone-50 grid grid-cols-1 lg:grid-cols-2 gap-12">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-stone-500">Tạm tính</span>
+                <span className="text-sm text-stone-500">Tạm tính gốc</span>
+                <span className="text-sm font-bold text-primary">{formatVnd(lineItemsTotal)} đ</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-stone-500">Giảm theo dòng</span>
+                <span className="text-sm font-bold text-primary">-{formatVnd(lineDiscountTotal)} đ</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-stone-500">Tạm tính sau giảm</span>
                 <span className="text-sm font-bold text-primary">{formatVnd(subtotal)} đ</span>
               </div>
               <div className="flex justify-between items-center">
@@ -604,7 +696,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
         </div>
       </div>
 
-      <div className="w-full max-w-[450px] xl:w-[450px] bg-white border-l border-stone-100 flex flex-col shadow-2xl z-10">
+      <div className="w-full max-w-[450px] xl:w-[450px] bg-white border-l border-stone-100 flex flex-col shadow-2xl z-10 min-h-0">
         <div className="p-10 space-y-10 flex-1 overflow-y-auto">
           <div className="text-center space-y-2 py-8 bg-stone-50 rounded-[2.5rem] border border-stone-100">
             <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỔNG CỘNG THANH TOÁN</p>
@@ -616,7 +708,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
               <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">HÌNH THỨC THANH TOÁN</h4>
               <button
                 type="button"
-                onClick={() => alert('Chia đôi thanh toán sẽ có trong bản sau.')}
+                onClick={() => setNoticeMessage('Chia đôi thanh toán sẽ có trong bản sau.')}
                 className="text-[10px] font-bold text-primary flex items-center gap-1 uppercase tracking-widest"
               >
                 <RefreshCcwIcon size={12} /> CHIA ĐÔI
@@ -672,7 +764,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
             <button
               type="button"
               onClick={() => handleQuickAmount(total)}
-              className="h-14 bg-secondary/10 text-secondary border border-secondary/20 rounded-2xl text-xs font-bold hover:bg-secondary/20 transition-all"
+              className="w-full h-14 bg-secondary/10 text-secondary border border-secondary/20 rounded-2xl text-xs font-bold hover:bg-secondary/20 transition-all"
             >
               CHẴN TIỀN
             </button>
@@ -684,7 +776,7 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
             <button
               type="button"
               onClick={() => handleQuickAmount(500000)}
-              className="h-14 bg-stone-50 text-stone-600 rounded-2xl text-xs font-bold hover:bg-stone-100 transition-all"
+              className="w-full h-14 bg-stone-50 text-stone-600 rounded-2xl text-xs font-bold hover:bg-stone-100 transition-all"
             >
               500k
             </button>
@@ -696,22 +788,22 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
             <button
               type="button"
               onClick={() => handleQuickAmount(200000)}
-              className="h-14 bg-stone-50 text-stone-600 rounded-2xl text-xs font-bold hover:bg-stone-100 transition-all"
+              className="w-full h-14 bg-stone-50 text-stone-600 rounded-2xl text-xs font-bold hover:bg-stone-100 transition-all"
             >
               200k
             </button>
-            <div />
+            <NumberButton label="⌫" onClick={handleBackspace} />
             <NumberButton label="0" onClick={() => handleNumberClick('0')} />
             <NumberButton label="C" onClick={handleClear} />
             <div />
           </div>
         </div>
 
-        <div className="p-10 pt-0 space-y-6">
+        <div className="p-8 pt-4 space-y-4 shrink-0 bg-white border-t border-stone-100">
           <button
             type="button"
             onClick={confirmPayment}
-            className="w-full bg-primary text-white py-6 rounded-[2rem] text-sm font-bold shadow-2xl hover:bg-primary-light transition-all flex items-center justify-center gap-3 active:scale-95"
+            className="w-full bg-primary text-white py-4 rounded-2xl text-sm font-bold shadow-xl hover:bg-primary-light transition-all flex items-center justify-center gap-3 active:scale-95"
           >
             <CheckCircle2 size={20} />
             XÁC NHẬN THANH TOÁN
@@ -730,6 +822,16 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {noticeMessage && (
+          <NoticeModal
+            title="Thông báo thanh toán"
+            message={noticeMessage}
+            onClose={() => setNoticeMessage(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isCustomerPickerOpen && (
@@ -801,13 +903,15 @@ export function POSView({ authToken, customers, employees, services, onCheckoutS
             onClose={() => {
               setIsSuccessModalOpen(false);
               setCheckoutOrderId(null);
+              setLastInvoice(null);
               resetTransaction();
               setSelectedCustomer(null);
               setIsWalkIn(false);
             }}
-            amount={formatVnd(total)}
-            customerName={customerDisplayName}
+            amount={formatVnd(lastInvoice?.total || total)}
+            customerName={lastInvoice?.customerName || customerDisplayName}
             orderId={checkoutOrderId}
+            invoice={lastInvoice}
           />
         )}
       </AnimatePresence>
@@ -930,7 +1034,7 @@ function NumberButton({ label, onClick }: { label: string; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="h-14 bg-stone-50 text-stone-600 rounded-2xl text-lg font-bold hover:bg-stone-100 transition-all active:scale-95"
+      className="w-full h-14 bg-stone-50 text-stone-600 rounded-2xl text-lg font-bold hover:bg-stone-100 transition-all active:scale-95"
     >
       {label}
     </button>
@@ -956,6 +1060,51 @@ function RefreshCcwIcon(props: React.SVGProps<SVGSVGElement>) {
       <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
       <path d="M16 16h5v5" />
     </svg>
+  );
+}
+
+function NoticeModal({
+  title,
+  message,
+  onClose,
+}: {
+  title: string;
+  message: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.18 }}
+        className="w-full max-w-md rounded-3xl bg-white border border-stone-200 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-7 pt-6 pb-4">
+          <h3 className="text-lg font-bold text-primary">{title}</h3>
+          <p className="mt-3 text-sm text-stone-600 leading-relaxed">{message}</p>
+        </div>
+        <div className="px-7 pb-6 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-11 min-w-[90px] px-5 rounded-2xl bg-primary text-white text-sm font-bold hover:bg-primary-light transition-all"
+          >
+            Đã hiểu
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 

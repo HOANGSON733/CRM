@@ -33,12 +33,15 @@ interface CustomersViewProps {
   authToken: string | null;
   onNewCustomer: () => void;
   onDeleteCustomer: (customer: Customer) => void;
+  onEditCustomer: (customer: Customer) => void;
+  onNewAppointmentForCustomer: (customer: Customer) => void;
+  onViewTechnicalNotes: (customer: Customer) => void;
   key?: string;
 }
 
 const PAGE_SIZE = 15;
 
-export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer }: CustomersViewProps) {
+export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer, onEditCustomer, onNewAppointmentForCustomer, onViewTechnicalNotes }: CustomersViewProps) {
   const [list, setList] = useState<Customer[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -444,6 +447,7 @@ export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer }: Cu
                       </span>
                       <button
                         type="button"
+                        onClick={() => onEditCustomer(selectedCustomer)}
                         className="px-3 py-1 bg-stone-100 text-stone-500 text-[10px] font-bold uppercase rounded-full hover:bg-stone-200 transition-colors"
                       >
                         Sửa
@@ -483,14 +487,19 @@ export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer }: Cu
                       </p>
                     </div>
                     <div className="flex justify-center gap-3">
-                      <button
-                        type="button"
-                        className="w-12 h-12 bg-stone-100 text-stone-600 rounded-2xl flex items-center justify-center hover:bg-secondary hover:text-white transition-all"
+                      <a
+                        href={selectedCustomer.phone ? `tel:${selectedCustomer.phone.replace(/\s+/g, '')}` : undefined}
+                        className={cn(
+                          "w-12 h-12 bg-stone-100 text-stone-600 rounded-2xl flex items-center justify-center transition-all",
+                          selectedCustomer.phone ? "hover:bg-secondary hover:text-white" : "opacity-40 pointer-events-none"
+                        )}
+                        aria-label="Gọi khách hàng"
                       >
                         <Phone size={20} />
-                      </button>
+                      </a>
                       <button
                         type="button"
+                        onClick={() => onNewAppointmentForCustomer(selectedCustomer)}
                         className="px-6 h-12 bg-primary text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg hover:bg-primary-light transition-all"
                       >
                         <CalendarIcon size={16} /> Đặt lịch mới
@@ -618,6 +627,7 @@ export function CustomersView({ authToken, onNewCustomer, onDeleteCustomer }: Cu
                 <div className="p-6 bg-stone-50 border-t border-stone-100">
                   <button
                     type="button"
+                    onClick={() => onViewTechnicalNotes(selectedCustomer)}
                     className="w-full py-4 bg-stone-900 text-white rounded-2xl text-sm font-bold shadow-xl hover:bg-stone-800 transition-all flex items-center justify-center gap-2"
                   >
                     <PlayCircle size={18} /> Xem ghi chú kỹ thuật (Color Formula)

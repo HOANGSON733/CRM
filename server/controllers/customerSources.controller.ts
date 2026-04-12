@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
+import { normalizeCustomerSourceIcon } from '../../shared/customerSourceIconIds';
 import { getTokenFromHeader, verifyAuthToken } from '../lib/auth';
 import { currentDb } from '../lib/db';
 
@@ -35,6 +36,7 @@ export async function listCustomerSources(req: Request, res: Response) {
         id: String(doc._id),
         name: String(doc.name || ''),
         sortOrder: typeof doc.sortOrder === 'number' ? doc.sortOrder : 0,
+        icon: normalizeCustomerSourceIcon(doc.icon),
       })),
     });
   } catch (_error) {
@@ -58,19 +60,21 @@ export async function createCustomerSource(req: Request, res: Response) {
       return res.status(409).json({ message: 'Nguồn khách này đã tồn tại.' });
     }
 
+    const icon = normalizeCustomerSourceIcon(req.body?.icon);
     const now = new Date();
     const sortOrder = await nextSortOrder();
     const doc = {
       name,
       normalizedName,
       sortOrder,
+      icon,
       createdAt: now,
       updatedAt: now,
     };
     const result = await col.insertOne(doc);
     return res.status(201).json({
       ok: true,
-      source: { id: String(result.insertedId), name, sortOrder },
+      source: { id: String(result.insertedId), name, sortOrder, icon },
     });
   } catch (_error) {
     return res.status(400).json({ message: 'Không thể thêm nguồn khách.' });
@@ -106,12 +110,18 @@ export async function updateCustomerSource(req: Request, res: Response) {
       return res.status(409).json({ message: 'Tên nguồn khách đã được dùng.' });
     }
 
+    const icon =
+      req.body?.icon !== undefined
+        ? normalizeCustomerSourceIcon(req.body.icon)
+        : normalizeCustomerSourceIcon(existing.icon);
+
     await col.updateOne(
       { _id: new ObjectId(id) },
       {
         $set: {
           name,
           normalizedName,
+          icon,
           updatedAt: new Date(),
         },
       }

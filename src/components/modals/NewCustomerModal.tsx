@@ -4,6 +4,11 @@ import { X, Upload } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { prepareImageFromFile } from '../../lib/imageUpload';
 import { CUSTOMER_SOURCES, DEFAULT_CUSTOMER_SOURCE } from '../../lib/customerSources';
+import {
+  CustomerSourceIcon,
+  DEFAULT_CUSTOMER_SOURCE_ICON,
+  normalizeCustomerSourceIcon,
+} from '../../lib/customerSourceIcons';
 import { Employee } from '../../types';
 
 interface NewCustomerModalProps {
@@ -24,7 +29,9 @@ interface NewCustomerModalProps {
 }
 
 export function NewCustomerModal({ authToken = null, onClose, onSave, employees }: NewCustomerModalProps) {
-  const [sourceOptions, setSourceOptions] = useState<string[]>(() => [...CUSTOMER_SOURCES]);
+  const [sourceOptions, setSourceOptions] = useState<Array<{ name: string; icon: string }>>(() =>
+    [...CUSTOMER_SOURCES].map((name) => ({ name, icon: DEFAULT_CUSTOMER_SOURCE_ICON }))
+  );
   const [selectedSource, setSelectedSource] = useState(DEFAULT_CUSTOMER_SOURCE);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -41,7 +48,7 @@ export function NewCustomerModal({ authToken = null, onClose, onSave, employees 
 
   const loadSourceOptions = useCallback(() => {
     if (!authToken) {
-      setSourceOptions([...CUSTOMER_SOURCES]);
+      setSourceOptions([...CUSTOMER_SOURCES].map((name) => ({ name, icon: DEFAULT_CUSTOMER_SOURCE_ICON })));
       return;
     }
     fetch('/api/customer-sources', {
@@ -50,12 +57,23 @@ export function NewCustomerModal({ authToken = null, onClose, onSave, employees 
       .then(async (r) => {
         const data = await r.json().catch(() => null);
         if (!r.ok) throw new Error(data?.message || 'Không thể tải nguồn khách.');
-        const names = Array.isArray(data?.sources)
-          ? data.sources.map((s: { name: string }) => String(s.name || '').trim()).filter(Boolean)
+        const rows = Array.isArray(data?.sources)
+          ? data.sources
+              .map((s: { name: string; icon?: string }) => ({
+                name: String(s.name || '').trim(),
+                icon: normalizeCustomerSourceIcon(s.icon),
+              }))
+              .filter((s) => s.name)
           : [];
-        setSourceOptions(names.length ? names : [...CUSTOMER_SOURCES]);
+        setSourceOptions(
+          rows.length
+            ? rows
+            : [...CUSTOMER_SOURCES].map((name) => ({ name, icon: DEFAULT_CUSTOMER_SOURCE_ICON }))
+        );
       })
-      .catch(() => setSourceOptions([...CUSTOMER_SOURCES]));
+      .catch(() =>
+        setSourceOptions([...CUSTOMER_SOURCES].map((name) => ({ name, icon: DEFAULT_CUSTOMER_SOURCE_ICON })))
+      );
   }, [authToken]);
 
   useEffect(() => {
@@ -69,7 +87,9 @@ export function NewCustomerModal({ authToken = null, onClose, onSave, employees 
   }, [loadSourceOptions]);
 
   useEffect(() => {
-    setSelectedSource((prev) => (sourceOptions.includes(prev) ? prev : sourceOptions[0] || DEFAULT_CUSTOMER_SOURCE));
+    setSelectedSource((prev) =>
+      sourceOptions.some((s) => s.name === prev) ? prev : sourceOptions[0]?.name || DEFAULT_CUSTOMER_SOURCE
+    );
   }, [sourceOptions]);
 
   const handleChooseAvatar = () => {
@@ -256,14 +276,15 @@ export function NewCustomerModal({ authToken = null, onClose, onSave, employees 
                   <div className="flex flex-wrap gap-2">
                     {sourceOptions.map((source) => (
                       <button 
-                        key={source}
-                        onClick={() => setSelectedSource(source)}
+                        key={source.name}
+                        onClick={() => setSelectedSource(source.name)}
                         className={cn(
-                          "px-4 py-2 rounded-full text-xs font-bold transition-all border",
-                          selectedSource === source ? "bg-secondary text-white border-secondary shadow-md" : "bg-white text-stone-500 border-stone-200 hover:border-stone-400"
+                          "inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all border",
+                          selectedSource === source.name ? "bg-secondary text-white border-secondary shadow-md" : "bg-white text-stone-500 border-stone-200 hover:border-stone-400"
                         )}
                       >
-                        {source}
+                        <CustomerSourceIcon iconId={source.icon} size={14} className={selectedSource === source.name ? 'text-white' : 'text-stone-400'} />
+                        {source.name}
                       </button>
                     ))}
                   </div>

@@ -7,9 +7,35 @@ interface PaymentSuccessModalProps {
   amount: string;
   customerName: string;
   orderId?: string | null;
+  invoice?: {
+    customerName: string;
+    paymentMethod: 'cash' | 'card' | 'qr' | 'voucher';
+    receivedAmount: number;
+    change: number;
+    lineItemsTotal: number;
+    lineDiscountTotal: number;
+    vipDiscount: number;
+    tipAmount: number;
+    vat: number;
+    total: number;
+    items: Array<{
+      name: string;
+      quantity: number;
+      unitPrice: number;
+      discountAmount: number;
+      lineTotal: number;
+    }>;
+  } | null;
 }
 
-export function PaymentSuccessModal({ onClose, amount, customerName, orderId }: PaymentSuccessModalProps) {
+function paymentMethodLabel(method: 'cash' | 'card' | 'qr' | 'voucher') {
+  if (method === 'cash') return 'Tiền mặt';
+  if (method === 'card') return 'Thẻ ngân hàng';
+  if (method === 'qr') return 'QR code';
+  return 'Voucher';
+}
+
+export function PaymentSuccessModal({ onClose, amount, customerName, orderId, invoice = null }: PaymentSuccessModalProps) {
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
       <motion.div 
@@ -37,21 +63,88 @@ export function PaymentSuccessModal({ onClose, amount, customerName, orderId }: 
           <p className="text-stone-500 text-sm">Giao dịch đã được ghi nhận vào hệ thống.</p>
         </div>
 
-        <div className="bg-stone-50 rounded-3xl p-6 space-y-4">
+        <div className="bg-stone-50 rounded-3xl p-6 space-y-4 text-left">
           <div className="flex justify-between items-center">
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">KHÁCH HÀNG</span>
-            <span className="text-sm font-bold text-primary">{customerName}</span>
+            <span className="text-sm font-bold text-primary text-right">{customerName}</span>
           </div>
           {orderId ? (
             <div className="flex justify-between items-center">
               <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">MÃ HÓA ĐƠN</span>
-              <span className="text-sm font-bold text-primary">{orderId}</span>
+              <span className="text-sm font-bold text-primary text-right">{orderId}</span>
             </div>
           ) : null}
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">SỐ TIỀN</span>
-            <span className="text-xl font-serif text-primary">{amount} đ</span>
-          </div>
+
+          {invoice ? (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">THANH TOÁN</span>
+                <span className="text-sm font-bold text-primary">{paymentMethodLabel(invoice.paymentMethod)}</span>
+              </div>
+
+              <div className="rounded-2xl bg-white border border-stone-200 p-3 space-y-2">
+                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">CHI TIẾT DÒNG HÓA ĐƠN</p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {invoice.items.map((item, idx) => (
+                    <div key={`${item.name}-${idx}`} className="text-xs text-stone-700">
+                      <div className="flex justify-between gap-3">
+                        <span className="font-semibold truncate">{item.name} x{item.quantity}</span>
+                        <span>{item.lineTotal.toLocaleString('vi-VN')}đ</span>
+                      </div>
+                      {item.discountAmount > 0 ? (
+                        <p className="text-[10px] text-stone-400">Giảm: -{item.discountAmount.toLocaleString('vi-VN')}đ</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span>Tạm tính gốc</span>
+                  <span>{invoice.lineItemsTotal.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span>Giảm theo dòng</span>
+                  <span>-{invoice.lineDiscountTotal.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span>Giảm VIP</span>
+                  <span>-{Math.round(invoice.vipDiscount).toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span>Tip</span>
+                  <span>{invoice.tipAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span>VAT</span>
+                  <span>{invoice.vat.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="h-px bg-stone-200 my-2" />
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">TỔNG THANH TOÁN</span>
+                  <span className="text-xl font-serif text-primary">{invoice.total.toLocaleString('vi-VN')} đ</span>
+                </div>
+                {invoice.paymentMethod === 'cash' ? (
+                  <>
+                    <div className="flex justify-between text-xs text-stone-600">
+                      <span>Khách đưa</span>
+                      <span>{invoice.receivedAmount.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-green-700">
+                      <span>Tiền thối</span>
+                      <span>{invoice.change.toLocaleString('vi-VN')}đ</span>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">SỐ TIỀN</span>
+              <span className="text-xl font-serif text-primary">{amount} đ</span>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">

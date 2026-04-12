@@ -32,9 +32,11 @@ interface NewAppointmentModalProps {
     status?: string;
   } | null;
   onSaved?: () => void;
+  initialStylistId?: string | null;
+  initialCustomerName?: string | null;
 }
 
-export function NewAppointmentModal({ onClose, authToken, services, employees, initialData = null, onSaved }: NewAppointmentModalProps) {
+export function NewAppointmentModal({ onClose, authToken, services, employees, initialData = null, onSaved, initialStylistId = null, initialCustomerName = null }: NewAppointmentModalProps) {
   const now = new Date();
   const isEditMode = Boolean(initialData?.id);
   const initialDate = initialData?.date && /^\d{4}-\d{2}-\d{2}$/.test(initialData.date)
@@ -65,8 +67,39 @@ export function NewAppointmentModal({ onClose, authToken, services, employees, i
   const selectedServiceObj = services.find((s) => String(s.id) === String(selectedService));
   const selectedStylistObj = employees.find((e) => String(e.id) === String(selectedStylist));
   const selectedDateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-  const disabledSlots = useMemo(() => new Set(bookedSlots), [bookedSlots]);
   const currentMonthYear = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(viewMonthDate);
+
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const isPastDate = (d: Date) => {
+    const normalized = new Date(d);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized.getTime() < todayStart.getTime();
+  };
+
+  const isPastTimeSlot = (time: string) => {
+    const [h, m] = time.split(':').map((v) => Number(v));
+    const slot = new Date(selectedDate);
+    slot.setHours(Number.isFinite(h) ? h : 0, Number.isFinite(m) ? m : 0, 0, 0);
+    return isSameDay(selectedDate, new Date()) && slot.getTime() < Date.now();
+  };
+
+  const disabledSlots = useMemo(() => {
+    const merged = new Set(bookedSlots);
+    timeSlots.forEach((slot) => {
+      if (isPastTimeSlot(slot)) merged.add(slot);
+    });
+    return merged;
+  }, [bookedSlots, timeSlots, selectedDate]);
 
   useEffect(() => {
     const nextDate = initialData?.date && /^\d{4}-\d{2}-\d{2}$/.test(initialData.date)
@@ -75,7 +108,7 @@ export function NewAppointmentModal({ onClose, authToken, services, employees, i
     setViewMonthDate(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
     setSelectedDate(nextDate);
     setSelectedTime(initialData?.time || '11:00');
-    setCustomerQuery(initialData?.customerName || '');
+    setCustomerQuery(initialData?.customerName || initialCustomerName || '');
     setNotes(initialData?.notes || '');
     setSmsReminder(initialData?.smsReminder ?? true);
     setSelectedService(
@@ -83,12 +116,13 @@ export function NewAppointmentModal({ onClose, authToken, services, employees, i
         ? String(initialData.serviceId)
         : String(services[0]?.id || '')
     );
+    const preferredStylistId = initialData?.stylistId || initialStylistId;
     setSelectedStylist(
-      initialData?.stylistId && employees.some((e) => String(e.id) === String(initialData.stylistId))
-        ? String(initialData.stylistId)
-        : (initialData?.stylistId ? 'any' : String(employees[0]?.id || 'any'))
+      preferredStylistId && employees.some((e) => String(e.id) === String(preferredStylistId))
+        ? String(preferredStylistId)
+        : (preferredStylistId ? 'any' : String(employees[0]?.id || 'any'))
     );
-  }, [initialData, services, employees]);
+  }, [initialData, initialStylistId, services, employees]);
 
   const calendarDays = useMemo(() => {
     const year = viewMonthDate.getFullYear();
@@ -151,6 +185,13 @@ export function NewAppointmentModal({ onClose, authToken, services, employees, i
       cancelled = true;
     };
   }, [authToken, selectedDateKey, selectedStylist]);
+
+  useEffect(() => {
+    if (!timeSlots.length) return;
+    if (!disabledSlots.has(selectedTime)) return;
+    const firstAvailable = timeSlots.find((slot) => !disabledSlots.has(slot));
+    if (firstAvailable) setSelectedTime(firstAvailable);
+  }, [selectedDateKey, disabledSlots, selectedTime, timeSlots]);
 
   const handleConfirmAppointment = async () => {
     if (!authToken) {
@@ -375,19 +416,23 @@ export function NewAppointmentModal({ onClose, authToken, services, employees, i
                       day.getDate() === selectedDate.getDate() &&
                       day.getMonth() === selectedDate.getMonth() &&
                       day.getFullYear() === selectedDate.getFullYear();
+                    const isDateDisabled = isPastDate(day);
                     return (
                     <button 
                       key={i} 
                       onClick={() => {
+                        if (isDateDisabled) return;
                         setSelectedDate(day);
                         if (!isInCurrentMonth) {
                           setViewMonthDate(new Date(day.getFullYear(), day.getMonth(), 1));
                         }
                       }}
+                      disabled={isDateDisabled}
                       className={cn(
                         "w-7 h-7 flex items-center justify-center rounded-lg mx-auto transition-all",
                         isSelected ? "bg-primary text-white shadow-md" : "hover:bg-stone-200",
-                        isInCurrentMonth ? "text-stone-700" : "text-stone-300"
+                        isInCurrentMonth ? "text-stone-700" : "text-stone-300",
+                        isDateDisabled && "opacity-35 cursor-not-allowed hover:bg-transparent"
                       )}
                     >
                       {day.getDate()}

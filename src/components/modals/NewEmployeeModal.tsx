@@ -13,6 +13,7 @@ interface NewEmployeeModalProps {
     role: string;
     commissionRate: number;
     specialties: string[];
+    birthday?: string;
     startDate: string;
     defaultShift: string;
     avatar?: string;
@@ -28,6 +29,7 @@ interface NewEmployeeModalProps {
     role: string;
     commissionRate: number;
     specialties: string[];
+    birthday?: string;
     startDate: string;
     defaultShift: string;
     avatar?: string;

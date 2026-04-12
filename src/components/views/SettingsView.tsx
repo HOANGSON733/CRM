@@ -32,6 +32,12 @@ import { EditServiceCategoryModal } from '../modals/EditServiceCategoryModal';
 import { DeleteServiceCategoryModal } from '../modals/DeleteServiceCategoryModal';
 import { DeleteCustomerSourceModal } from '../modals/DeleteCustomerSourceModal';
 import { cn } from '../../lib/utils';
+import {
+  CUSTOMER_SOURCE_ICON_OPTIONS,
+  CustomerSourceIcon,
+  DEFAULT_CUSTOMER_SOURCE_ICON,
+  normalizeCustomerSourceIcon,
+} from '../../lib/customerSourceIcons';
 import { Product, ProductCategoryConfig, Service, ServiceCategoryConfig } from '../../types';
 
 interface SettingsViewProps {
@@ -127,12 +133,13 @@ export function SettingsView({
   const [productCategoryToEdit, setProductCategoryToEdit] = useState<ProductCategoryConfig | null>(null);
   const [productCategoryToDelete, setProductCategoryToDelete] = useState<ProductCategoryConfig | null>(null);
 
-  const [customerSources, setCustomerSources] = useState<Array<{ id: string; name: string }>>([]);
+  const [customerSources, setCustomerSources] = useState<Array<{ id: string; name: string; icon: string }>>([]);
   const [sourcesLoading, setSourcesLoading] = useState(false);
   const [sourcesLoadError, setSourcesLoadError] = useState<string | null>(null);
   const [sourceEditorOpen, setSourceEditorOpen] = useState(false);
   const [sourceEditorId, setSourceEditorId] = useState<string | null>(null);
   const [sourceEditorName, setSourceEditorName] = useState('');
+  const [sourceEditorIcon, setSourceEditorIcon] = useState(DEFAULT_CUSTOMER_SOURCE_ICON);
   const [sourceSaving, setSourceSaving] = useState(false);
   const [sourceToDelete, setSourceToDelete] = useState<{ id: string; name: string } | null>(null);
 
@@ -153,9 +160,10 @@ export function SettingsView({
         throw new Error(data?.message || 'Không thể tải danh sách nguồn khách.');
       }
       const list = Array.isArray(data?.sources)
-        ? data.sources.map((s: { id: string; name: string }) => ({
+        ? data.sources.map((s: { id: string; name: string; icon?: string }) => ({
             id: String(s.id),
             name: String(s.name || ''),
+            icon: normalizeCustomerSourceIcon(s.icon),
           }))
         : [];
       setCustomerSources(list);
@@ -175,12 +183,14 @@ export function SettingsView({
   const openCreateSource = () => {
     setSourceEditorId(null);
     setSourceEditorName('');
+    setSourceEditorIcon(DEFAULT_CUSTOMER_SOURCE_ICON);
     setSourceEditorOpen(true);
   };
 
-  const openEditSource = (id: string, name: string) => {
+  const openEditSource = (id: string, name: string, icon?: string) => {
     setSourceEditorId(id);
     setSourceEditorName(name);
+    setSourceEditorIcon(normalizeCustomerSourceIcon(icon));
     setSourceEditorOpen(true);
   };
 
@@ -204,7 +214,7 @@ export function SettingsView({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, icon: sourceEditorIcon }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
@@ -752,14 +762,14 @@ export function SettingsView({
                       >
                         <div className="flex items-center gap-4 min-w-0">
                           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm bg-primary shrink-0">
-                            <Share2 size={18} />
+                            <CustomerSourceIcon iconId={src.icon} size={18} />
                           </div>
                           <span className="text-sm font-bold text-primary truncate">{src.name}</span>
                         </div>
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                           <button
                             type="button"
-                            onClick={() => openEditSource(src.id, src.name)}
+                            onClick={() => openEditSource(src.id, src.name, src.icon)}
                             className="text-stone-300 hover:text-primary transition-colors"
                             aria-label="Sửa nguồn khách"
                           >
@@ -875,8 +885,11 @@ export function SettingsView({
             {customerSources.map((source) => (
               <span
                 key={source.id}
-                className="bg-white border border-stone-100 px-4 py-2 rounded-xl text-[10px] font-bold text-stone-600 shadow-sm"
+                className="inline-flex items-center gap-2 bg-white border border-stone-100 px-4 py-2 rounded-xl text-[10px] font-bold text-stone-600 shadow-sm"
               >
+                <span className="text-primary">
+                  <CustomerSourceIcon iconId={source.icon} size={14} />
+                </span>
                 {source.name}
               </span>
             ))}
@@ -1053,19 +1066,46 @@ export function SettingsView({
                   <X size={22} />
                 </button>
               </div>
-              <div className="p-8 space-y-4">
-                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">
-                  Tên nguồn
-                </label>
-                <input
-                  type="text"
-                  value={sourceEditorName}
-                  onChange={(e) => setSourceEditorName(e.target.value)}
-                  placeholder="Ví dụ: Facebook, Zalo..."
-                  disabled={sourceSaving}
-                  className="w-full bg-stone-50 border border-stone-100 rounded-2xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all outline-none disabled:opacity-60"
-                  autoFocus
-                />
+              <div className="p-8 space-y-6">
+                <div className="space-y-4">
+                  <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">
+                    Tên nguồn
+                  </label>
+                  <input
+                    type="text"
+                    value={sourceEditorName}
+                    onChange={(e) => setSourceEditorName(e.target.value)}
+                    placeholder="Ví dụ: Facebook, Zalo..."
+                    disabled={sourceSaving}
+                    className="w-full bg-stone-50 border border-stone-100 rounded-2xl py-4 px-5 text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all outline-none disabled:opacity-60"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-stone-400 uppercase tracking-widest block">
+                    Icon hiển thị
+                  </label>
+                  <div className="grid grid-cols-6 gap-2">
+                    {CUSTOMER_SOURCE_ICON_OPTIONS.map(({ id, component: IconCmp }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        disabled={sourceSaving}
+                        onClick={() => setSourceEditorIcon(id)}
+                        className={cn(
+                          'h-12 rounded-xl flex items-center justify-center transition-all text-stone-500',
+                          sourceEditorIcon === id
+                            ? 'bg-primary text-white shadow-md scale-105'
+                            : 'bg-stone-50 hover:bg-stone-100',
+                          sourceSaving && 'opacity-50 pointer-events-none'
+                        )}
+                        aria-label={`Chọn icon ${id}`}
+                      >
+                        <IconCmp size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="p-8 pt-0 flex justify-end gap-3">
                 <button

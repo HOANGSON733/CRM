@@ -5,10 +5,10 @@ import {
   Plus, 
   Filter, 
   Star, 
-  ChevronRight, 
+  ChevronRight,
+  ChevronLeft,
   Lightbulb, 
-  ArrowRight, 
-  Clock 
+  ArrowRight
 } from 'lucide-react';
 import { KPICard } from '../KPICard';
 import { cn } from '../../lib/utils';
@@ -19,6 +19,7 @@ interface EmployeesViewProps {
   employees: Employee[];
   onNewEmployee: () => void;
   onViewProfile: (employee: Employee) => void;
+  onNewAppointment: (employee: Employee) => void;
   key?: string;
 }
 
@@ -45,37 +46,64 @@ function getStatusBadge(status: Employee['status']) {
 }
 
 type StaffPerf = { name: string; value: number; customers: number };
+type StaffRecentActivity = { id: string; staffName: string; text: string; createdAt: string | Date };
 
-export function EmployeesView({ authToken, employees, onNewEmployee, onViewProfile }: EmployeesViewProps) {
+export function EmployeesView({ authToken, employees, onNewEmployee, onViewProfile, onNewAppointment }: EmployeesViewProps) {
   const [staffPerformanceData, setStaffPerformanceData] = useState<StaffPerf[]>([]);
+  const [recentActivities, setRecentActivities] = useState<StaffRecentActivity[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const employeesPerPage = 8;
 
   useEffect(() => {
     if (!authToken) return;
     let cancelled = false;
-    fetch('/api/analytics/staff-performance', {
-      headers: { Authorization: `Bearer ${authToken}` },
-    })
-      .then(async (r) => {
+
+    const authHeaders = { Authorization: `Bearer ${authToken}` };
+
+    Promise.all([
+      fetch('/api/analytics/staff-performance', { headers: authHeaders }).then(async (r) => {
         if (!r.ok) {
           const data = await r.json().catch(() => null);
           throw new Error(data?.message || 'Không thể tải hiệu suất nhân viên.');
         }
         return r.json();
-      })
-      .then((data) => {
+      }),
+      fetch('/api/analytics/staff-recent-activities', { headers: authHeaders }).then(async (r) => {
+        if (!r.ok) {
+          const data = await r.json().catch(() => null);
+          throw new Error(data?.message || 'Không thể tải hoạt động mới.');
+        }
+        return r.json();
+      }),
+    ])
+      .then(([perfData, activityData]) => {
         if (cancelled) return;
-        setStaffPerformanceData(Array.isArray(data?.staffPerformanceData) ? data.staffPerformanceData : []);
+        setStaffPerformanceData(Array.isArray(perfData?.staffPerformanceData) ? perfData.staffPerformanceData : []);
+        setRecentActivities(Array.isArray(activityData?.activities) ? activityData.activities : []);
       })
       .catch(() => {
         if (cancelled) return;
         setStaffPerformanceData([]);
+        setRecentActivities([]);
       });
+
     return () => {
       cancelled = true;
     };
   }, [authToken]);
 
   const workingCount = employees.filter((e) => e.status === 'busy' || e.status === 'available').length;
+  const totalPages = Math.max(1, Math.ceil(employees.length / employeesPerPage));
+  const paginatedEmployees = employees.slice(
+    (currentPage - 1) * employeesPerPage,
+    currentPage * employeesPerPage
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <motion.div 
@@ -161,7 +189,7 @@ export function EmployeesView({ authToken, employees, onNewEmployee, onViewProfi
 
       {/* Employee Grid */}
       <div className="grid grid-cols-4 gap-8">
-        {employees.map((employee) => {
+        {paginatedEmployees.map((employee) => {
           const badge = getStatusBadge(employee.status);
           return (
           <motion.div 
@@ -207,7 +235,10 @@ export function EmployeesView({ authToken, employees, onNewEmployee, onViewProfi
                 >
                   Hồ Sơ
                 </button>
-                <button className="flex-1 py-3 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-primary-light transition-colors shadow-md">
+                <button
+                  onClick={() => onNewAppointment(employee)}
+                  className="flex-1 py-3 bg-primary text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-primary-light transition-colors shadow-md"
+                >
                   Đặt Lịch
                 </button>
               </div>
@@ -215,6 +246,35 @@ export function EmployeesView({ authToken, employees, onNewEmployee, onViewProfi
           </motion.div>
           );
         })}
+      </div>
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold uppercase tracking-widest text-stone-400">
+          Hiển thị {paginatedEmployees.length} / {employees.length} nhân viên
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="h-10 w-10 rounded-xl border border-stone-200 bg-white text-stone-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-stone-50 transition-colors flex items-center justify-center"
+            aria-label="Trang trước"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          <div className="px-4 h-10 rounded-xl bg-stone-100 text-xs font-bold text-stone-600 flex items-center">
+            Trang {currentPage} / {totalPages}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="h-10 w-10 rounded-xl border border-stone-200 bg-white text-stone-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-stone-50 transition-colors flex items-center justify-center"
+            aria-label="Trang sau"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Performance Dashboard */}
@@ -279,18 +339,18 @@ export function EmployeesView({ authToken, employees, onNewEmployee, onViewProfi
             <div className="bg-stone-100/50 p-8 rounded-[2.5rem] space-y-6">
               <h4 className="text-sm font-bold uppercase tracking-widest text-stone-400">Hoạt động mới</h4>
               <div className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="w-2 h-2 bg-secondary rounded-full mt-1.5 shrink-0" />
-                  <p className="text-xs text-stone-600 leading-relaxed">
-                    <span className="font-bold text-primary">Mỹ Linh</span> vừa hoàn thành ca nhuộm lúc 10:45.
-                  </p>
-                </div>
-                <div className="flex gap-4">
-                  <div className="w-2 h-2 bg-secondary rounded-full mt-1.5 shrink-0" />
-                  <p className="text-xs text-stone-600 leading-relaxed">
-                    <span className="font-bold text-primary">Hoàng Nam</span> được đánh giá 5 sao từ khách hàng Minh Anh.
-                  </p>
-                </div>
+                {recentActivities.length === 0 ? (
+                  <p className="text-xs text-stone-500">Chưa có hoạt động gần đây.</p>
+                ) : (
+                  recentActivities.slice(0, 5).map((activity) => (
+                    <div key={activity.id} className="flex gap-4">
+                      <div className="w-2 h-2 bg-secondary rounded-full mt-1.5 shrink-0" />
+                      <p className="text-xs text-stone-600 leading-relaxed">
+                        <span className="font-bold text-primary">{activity.staffName}</span> {activity.text}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

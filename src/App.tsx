@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -18,7 +18,11 @@ import {
   Search,
   Bell,
   LogOut,
-  HelpCircle
+  HelpCircle,
+  CheckCircle2,
+  TriangleAlert,
+  Info,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -68,6 +72,15 @@ const TAB_PATHS: Partial<Record<View, string>> = {
   login: '/login',
 };
 
+type ToastType = 'success' | 'error' | 'info';
+
+type AppToast = {
+  id: number;
+  type: ToastType;
+  title: string;
+  message: string;
+};
+
 function getTabFromPath(pathname: string): View {
   switch (pathname) {
     case '/':
@@ -106,6 +119,8 @@ export default function App() {
   const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
   const [activeTab, setActiveTab] = useState<View>(() => getTabFromPath(window.location.pathname));
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
+  const [appointmentInitialStylistId, setAppointmentInitialStylistId] = useState<string | null>(null);
+  const [appointmentInitialCustomerName, setAppointmentInitialCustomerName] = useState<string | null>(null);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const [isNewEmployeeModalOpen, setIsNewEmployeeModalOpen] = useState(false);
   const [isEditEmployeeModalOpen, setIsEditEmployeeModalOpen] = useState(false);
@@ -131,6 +146,26 @@ export default function App() {
   const [productsPage, setProductsPage] = useState(1);
   const [productsTotalPages, setProductsTotalPages] = useState(1);
   const [productsTotal, setProductsTotal] = useState(0);
+  const [toasts, setToasts] = useState<AppToast[]>([]);
+  const [quickSearch, setQuickSearch] = useState('');
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
+  const quickSearchInputRef = useRef<HTMLInputElement | null>(null);
+
+  const dismissToast = (id: number) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  };
+
+  const showToast = (
+    type: ToastType,
+    title: string,
+    message: string,
+  ) => {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((prev) => [...prev, { id, type, title, message }]);
+    window.setTimeout(() => {
+      dismissToast(id);
+    }, 3200);
+  };
 
   const loadCustomers = async (token: string) => {
     const response = await fetch('/api/customers?page=1&pageSize=500', {
@@ -578,7 +613,75 @@ export default function App() {
 
   const navigateToTab = (tab: View) => {
     setActiveTab(tab);
+    setIsQuickSearchOpen(false);
+    setQuickSearch('');
   };
+
+  const quickSearchItems = useMemo(() => {
+    const navItems: Array<{
+      kind: 'nav' | 'customer' | 'employee' | 'service' | 'product';
+      id: string;
+      tab: View;
+      label: string;
+      subtitle: string;
+      keywords: string;
+    }> = [
+      { kind: 'nav', id: 'dashboard', tab: 'dashboard', label: 'Tổng quan', subtitle: 'Đi đến trang', keywords: 'dashboard tong quan home' },
+      { kind: 'nav', id: 'appointments', tab: 'appointments', label: 'Lịch hẹn', subtitle: 'Đi đến trang', keywords: 'appointments lich hen dat lich' },
+      { kind: 'nav', id: 'customers', tab: 'customers', label: 'Khách hàng', subtitle: 'Đi đến trang', keywords: 'customers khach hang' },
+      { kind: 'nav', id: 'employees', tab: 'employees', label: 'Nhân viên', subtitle: 'Đi đến trang', keywords: 'employees nhan vien' },
+      { kind: 'nav', id: 'services', tab: 'services', label: 'Dịch vụ & Giá', subtitle: 'Đi đến trang', keywords: 'services dich vu gia' },
+      { kind: 'nav', id: 'products', tab: 'products', label: 'Sản phẩm', subtitle: 'Đi đến trang', keywords: 'products san pham kho' },
+      { kind: 'nav', id: 'reports', tab: 'reports', label: 'Báo cáo', subtitle: 'Đi đến trang', keywords: 'reports bao cao thong ke' },
+      { kind: 'nav', id: 'marketing', tab: 'marketing', label: 'Tích điểm & Marketing', subtitle: 'Đi đến trang', keywords: 'marketing tich diem promo' },
+      { kind: 'nav', id: 'pos', tab: 'pos', label: 'POS & Thanh toán', subtitle: 'Đi đến trang', keywords: 'pos thanh toan ban hang' },
+      { kind: 'nav', id: 'settings', tab: 'settings', label: 'Hệ thống', subtitle: 'Đi đến trang', keywords: 'settings he thong cai dat' },
+    ];
+
+    const customerItems = customers.slice(0, 60).map((c) => ({
+      kind: 'customer' as const,
+      id: `customer-${String(c.id)}`,
+      tab: 'customers' as View,
+      label: c.name,
+      subtitle: `Khách hàng • ${c.phone || 'Không có SĐT'}`,
+      keywords: `${c.name} ${c.phone || ''} customer khach hang`,
+    }));
+
+    const employeeItems = employees.slice(0, 60).map((e) => ({
+      kind: 'employee' as const,
+      id: `employee-${String(e.id)}`,
+      tab: 'employees' as View,
+      label: e.name,
+      subtitle: `Nhân viên • ${e.role || 'STAFF'}`,
+      keywords: `${e.name} ${e.role || ''} employee nhan vien`,
+    }));
+
+    const serviceItems = services.slice(0, 80).map((s) => ({
+      kind: 'service' as const,
+      id: `service-${String(s.id)}`,
+      tab: 'services' as View,
+      label: s.name,
+      subtitle: `Dịch vụ • ${s.category || 'Danh mục khác'}`,
+      keywords: `${s.name} ${s.category || ''} service dich vu`,
+    }));
+
+    const productItems = products.slice(0, 80).map((p) => ({
+      kind: 'product' as const,
+      id: `product-${String(p.id)}`,
+      tab: 'products' as View,
+      label: p.name,
+      subtitle: `Sản phẩm • ${p.brand || 'Nhãn khác'}`,
+      keywords: `${p.name} ${p.brand || ''} ${p.category || ''} product san pham`,
+    }));
+
+    const allItems = [...navItems, ...customerItems, ...employeeItems, ...serviceItems, ...productItems];
+    const q = quickSearch.trim().toLowerCase();
+    if (!q) return allItems.slice(0, 20);
+
+    return allItems
+      .filter((item) => `${item.label.toLowerCase()} ${item.keywords.toLowerCase()}`.includes(q))
+      .slice(0, 40);
+  }, [quickSearch, customers, employees, services, products]);
 
   const handleCreateCustomer = async (payload: {
     name: string;
@@ -757,6 +860,28 @@ export default function App() {
     }
   }, [activeTab, selectedEmployee, isLoggedIn]);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsQuickSearchOpen(true);
+      }
+      if (e.key === 'Escape') {
+        setIsQuickSearchOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (isQuickSearchOpen) {
+      window.setTimeout(() => quickSearchInputRef.current?.focus(), 0);
+    }
+  }, [isQuickSearchOpen]);
+
   if (authChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-stone-50 text-stone-500 text-sm font-bold tracking-wider">
@@ -858,7 +983,11 @@ export default function App() {
             />
           </div>
           <button 
-            onClick={() => setIsNewAppointmentModalOpen(true)}
+            onClick={() => {
+              setAppointmentInitialStylistId(null);
+              setAppointmentInitialCustomerName(null);
+              setIsNewAppointmentModalOpen(true);
+            }}
             className="w-full bg-primary text-white py-4 rounded-2xl text-xs font-bold shadow-xl hover:bg-primary-light transition-all active:scale-95"
           >
             Đặt lịch mới
@@ -872,11 +1001,13 @@ export default function App() {
         <header className="h-24 bg-white/80 backdrop-blur-md border-b border-stone-100 px-10 flex items-center justify-between sticky top-0 z-40">
           <div className="relative w-96">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-            <input 
-              type="text" 
-              placeholder="Tìm kiếm nhanh (Cmd + K)..." 
-              className="w-full bg-stone-100/50 border-none rounded-xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-primary/10 transition-all"
-            />
+            <button
+              type="button"
+              onClick={() => setIsQuickSearchOpen(true)}
+              className="w-full bg-stone-100/50 border-none rounded-xl py-3 pl-12 pr-4 text-sm text-left text-stone-400 hover:bg-stone-100 transition-all"
+            >
+              Tìm kiếm nhanh (Cmd + K)...
+            </button>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 px-4 py-2 bg-stone-100 rounded-full">
@@ -904,7 +1035,11 @@ export default function App() {
             <AppointmentsView
               key="appointments"
               authToken={authToken}
-              onNewAppointment={() => setIsNewAppointmentModalOpen(true)}
+              onNewAppointment={() => {
+                setAppointmentInitialStylistId(null);
+                setAppointmentInitialCustomerName(null);
+                setIsNewAppointmentModalOpen(true);
+              }}
               services={services}
               employees={employees}
             />
@@ -914,13 +1049,28 @@ export default function App() {
               authToken={authToken}
               onNewCustomer={() => setIsNewCustomerModalOpen(true)}
               onDeleteCustomer={(customer) => setCustomerToDelete(customer)}
+              onEditCustomer={(customer) => {
+                alert(`Chức năng sửa khách hàng (${customer.name}) sẽ được bổ sung ở bước tiếp theo.`);
+              }}
+              onNewAppointmentForCustomer={(customer) => {
+                setAppointmentInitialStylistId(null);
+                setAppointmentInitialCustomerName(customer.name || '');
+                setIsNewAppointmentModalOpen(true);
+              }}
+              onViewTechnicalNotes={(customer) => {
+                alert(`Tính năng ghi chú kỹ thuật cho ${customer.name} sẽ được bổ sung ở bước tiếp theo.`);
+              }}
             />
           ) : activeTab === 'employees' ? (
             <EmployeesView 
               key="employees" 
               authToken={authToken}
               employees={employees}
-              onNewEmployee={() => setIsNewEmployeeModalOpen(true)} 
+              onNewEmployee={() => setIsNewEmployeeModalOpen(true)}
+              onNewAppointment={(employee) => {
+                setAppointmentInitialStylistId(String(employee.id));
+                setIsNewAppointmentModalOpen(true);
+              }}
               onViewProfile={(emp) => {
                 setSelectedEmployee(emp);
                 navigateToTab('employee-profile');
@@ -1018,7 +1168,13 @@ export default function App() {
             authToken={authToken}
             services={services}
             employees={employees}
-            onClose={() => setIsNewAppointmentModalOpen(false)}
+            initialStylistId={appointmentInitialStylistId}
+            initialCustomerName={appointmentInitialCustomerName}
+            onClose={() => {
+              setIsNewAppointmentModalOpen(false);
+              setAppointmentInitialStylistId(null);
+              setAppointmentInitialCustomerName(null);
+            }}
           />
         )}
       </AnimatePresence>
@@ -1029,7 +1185,16 @@ export default function App() {
           <NewCustomerModal
             authToken={authToken}
             onClose={() => setIsNewCustomerModalOpen(false)}
-            onSave={handleCreateCustomer}
+            onSave={async (payload) => {
+              try {
+                await handleCreateCustomer(payload);
+                showToast('success', 'Thành công', 'Đã thêm khách hàng mới thành công.');
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Không thể tạo khách hàng mới.';
+                showToast('error', 'Thất bại', message);
+                throw error;
+              }
+            }}
             employees={employees}
           />
         )}
@@ -1061,7 +1226,16 @@ export default function App() {
         {isNewEmployeeModalOpen && (
           <NewEmployeeModal
             onClose={() => setIsNewEmployeeModalOpen(false)}
-            onSave={handleCreateEmployee}
+            onSave={async (payload) => {
+              try {
+                await handleCreateEmployee(payload);
+                showToast('success', 'Thành công', 'Đã thêm nhân viên mới thành công.');
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Không thể tạo nhân viên mới.';
+                showToast('error', 'Thất bại', message);
+                throw error;
+              }
+            }}
           />
         )}
       </AnimatePresence>
@@ -1071,7 +1245,16 @@ export default function App() {
         {isEditEmployeeModalOpen && selectedEmployee && (
           <NewEmployeeModal
             onClose={() => setIsEditEmployeeModalOpen(false)}
-            onSave={handleUpdateEmployee}
+            onSave={async (payload) => {
+              try {
+                await handleUpdateEmployee(payload);
+                showToast('success', 'Thành công', 'Đã cập nhật nhân viên thành công.');
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Không thể cập nhật nhân viên.';
+                showToast('error', 'Thất bại', message);
+                throw error;
+              }
+            }}
             title="Cập Nhật Nhân Viên"
             description="Điều chỉnh hồ sơ nhân viên để thông tin luôn chính xác cho vận hành và chăm sóc khách hàng."
             saveLabel="Cập nhật nhân viên"
@@ -1107,7 +1290,16 @@ export default function App() {
         {isNewServiceModalOpen && (
           <NewServiceModal
             onClose={() => setIsNewServiceModalOpen(false)}
-            onSave={handleCreateService}
+            onSave={async (payload) => {
+              try {
+                await handleCreateService(payload);
+                showToast('success', 'Thành công', 'Đã thêm dịch vụ mới thành công.');
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Không thể tạo dịch vụ mới.';
+                showToast('error', 'Thất bại', message);
+                throw error;
+              }
+            }}
             categories={serviceCategories.map((c) => c.name)}
           />
         )}
@@ -1118,7 +1310,16 @@ export default function App() {
         {isNewProductModalOpen && (
           <NewProductModal
             onClose={() => setIsNewProductModalOpen(false)}
-            onSave={handleCreateProduct}
+            onSave={async (payload) => {
+              try {
+                await handleCreateProduct(payload);
+                showToast('success', 'Thành công', 'Đã thêm sản phẩm mới thành công.');
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Không thể tạo sản phẩm mới.';
+                showToast('error', 'Thất bại', message);
+                throw error;
+              }
+            }}
             categories={productCategories.map((c) => c.name)}
           />
         )}
@@ -1129,7 +1330,16 @@ export default function App() {
         {productToEdit && (
           <NewProductModal
             onClose={() => setProductToEdit(null)}
-            onSave={(payload) => handleUpdateProduct(productToEdit.id, payload)}
+            onSave={async (payload) => {
+              try {
+                await handleUpdateProduct(productToEdit.id, payload);
+                showToast('success', 'Thành công', 'Đã cập nhật sản phẩm thành công.');
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Không thể cập nhật sản phẩm.';
+                showToast('error', 'Thất bại', message);
+                throw error;
+              }
+            }}
             categories={productCategories.map((c) => c.name)}
             initialData={productToEdit}
             title="Cập Nhật Sản Phẩm"
@@ -1171,9 +1381,10 @@ export default function App() {
                 try {
                   await handleUpdateService(updated);
                   setServiceToEdit(null);
+                  showToast('success', 'Thành công', 'Đã cập nhật dịch vụ thành công.');
                 } catch (e) {
                   const message = e instanceof Error ? e.message : 'Không thể cập nhật dịch vụ.';
-                  alert(message);
+                  showToast('error', 'Thất bại', message);
                 }
               })();
             }}
@@ -1218,6 +1429,99 @@ export default function App() {
           <NewPromoCodeModal onClose={() => setIsNewPromoCodeModalOpen(false)} />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {isQuickSearchOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[450] bg-black/30 backdrop-blur-sm p-4"
+            onClick={() => setIsQuickSearchOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.98 }}
+              transition={{ duration: 0.16 }}
+              className="max-w-2xl mx-auto mt-24 bg-white rounded-3xl border border-stone-100 shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b border-stone-100">
+                <div className="relative">
+                  <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    ref={quickSearchInputRef}
+                    value={quickSearch}
+                    onChange={(e) => setQuickSearch(e.target.value)}
+                    placeholder="Tìm trang... (ví dụ: khách hàng, POS, báo cáo)"
+                    className="w-full pl-10 pr-4 py-3 bg-stone-50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10"
+                  />
+                </div>
+              </div>
+
+              <div className="max-h-[55vh] overflow-y-auto p-3">
+                {quickSearchItems.length === 0 ? (
+                  <p className="px-3 py-8 text-sm text-stone-400 text-center">Không tìm thấy mục phù hợp.</p>
+                ) : (
+                  quickSearchItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => navigateToTab(item.tab)}
+                      className="w-full text-left px-4 py-3 rounded-xl hover:bg-stone-50 flex items-center justify-between gap-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-primary truncate">{item.label}</p>
+                        <p className="text-xs text-stone-400 truncate">{item.subtitle}</p>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 shrink-0">Mở</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="fixed top-6 right-6 z-[500] space-y-3">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={cn(
+              'relative overflow-hidden min-w-[320px] max-w-[380px] rounded-2xl bg-white border border-stone-200 shadow-xl',
+              toast.type === 'success' && 'before:absolute before:left-0 before:top-0 before:h-full before:w-1.5 before:bg-amber-700',
+              toast.type === 'error' && 'before:absolute before:left-0 before:top-0 before:h-full before:w-1.5 before:bg-red-600',
+              toast.type === 'info' && 'before:absolute before:left-0 before:top-0 before:h-full before:w-1.5 before:bg-rose-700'
+            )}
+          >
+            <div className="flex items-start gap-3 px-4 py-3.5 pl-5">
+              <div
+                className={cn(
+                  'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                  toast.type === 'success' && 'bg-amber-100 text-amber-700',
+                  toast.type === 'error' && 'bg-red-100 text-red-700',
+                  toast.type === 'info' && 'bg-rose-100 text-rose-700'
+                )}
+              >
+                {toast.type === 'success' ? <CheckCircle2 size={16} /> : toast.type === 'error' ? <TriangleAlert size={16} /> : <Info size={16} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-bold text-stone-800">{toast.title}</p>
+                <p className="mt-0.5 text-xs leading-5 text-stone-500">{toast.message}</p>
+              </div>
+              <button
+                onClick={() => dismissToast(toast.id)}
+                className="text-stone-300 hover:text-stone-500 transition-colors"
+                aria-label="Đóng thông báo"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
